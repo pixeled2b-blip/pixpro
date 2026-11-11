@@ -926,16 +926,19 @@ async function rechercherNafPilotage(e){
   return e.naf||"";
 }
 function synchroniserPilotage(rows,url,target){
+  const frame=document.createElement("iframe");
+  frame.name=target;frame.title="Synchronisation du pilotage";frame.style.display="none";
+  document.body.appendChild(frame);
   const form=document.createElement("form");
   form.method="POST";form.action=url;form.target=target;form.style.display="none";
   const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows});
   form.appendChild(input);document.body.appendChild(form);form.submit();form.remove();
+  setTimeout(()=>frame.remove(),30000);
   return true;
 }
 async function exportPilotage(){
   const syncUrl=ls.get("pilotage_sync_url");
   const syncTarget=syncUrl?"pilotage_sync_"+Date.now():"";
-  const syncTab=syncUrl?window.open("about:blank",syncTarget):null;
   const prospects=ents;
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
@@ -949,12 +952,12 @@ async function exportPilotage(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows,{header:["Entreprise","Adresse","Téléphone commerce","Portable contact","Coordonnées GPS","Devis souhaité","Décideur","Fonction","Secteur"]}),"02_CRM_Prospects");
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-  const syncSent=syncUrl&&syncTab?synchroniserPilotage(rows,syncUrl,syncTarget):false;
+  const syncSent=syncUrl?synchroniserPilotage(rows,syncUrl,syncTarget):false;
   download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-pour-pilotage-"+today()+".xlsx");
   const sansSecteur=rows.filter(r=>!r.Secteur).length;
   let msg=rows.length+" entreprises exportées; "+sansSecteur+" sans secteur NAF reconnu.";
-  if(syncSent)msg+=" Envoi lancé; regarde la réponse dans l’onglet ouvert.";
-  else if(syncUrl)msg+=" Envoi bloqué par le navigateur; autorise les fenêtres pour cette application.";
+  if(syncSent)msg+=" Synchronisation envoyée au pilotage; vérifie l’onglet 02_CRM_Prospects.";
+  else if(syncUrl)msg+=" Envoi bloqué par le navigateur; réessaie après avoir autorisé les téléchargements.";
   else msg+=" Enregistre l’URL Apps Script pour activer l’envoi automatique.";
   toast(msg,6000)
 }
