@@ -809,7 +809,7 @@ function viewDonnees(m){
   $("#gsave").onclick=()=>{const v=$("#gtoken").value.trim();if(v){ls.set("google_key",v);$("#gtoken").value="";toast("Clé enregistrée")}};
   $("#xlsx").onclick=exportXlsx;
   $("#pilot").onclick=exportPilotage;
-  const pilotageUrlDefaut="https://docs.google.com/spreadsheets/d/1rz0lDcEpe-CzY0-lPF2IpqTGpSShwZtG/edit?gid=527750812#gid=527750812";
+  const pilotageUrlDefaut="https://docs.google.com/spreadsheets/d/1z4UplP97Gc8r-epNc__RQ5qlliMLhTu8Dc0sZmCeE5o/edit?gid=489064016#gid=489064016";
   if(!ls.get("pilotage_drive_url"))ls.set("pilotage_drive_url",pilotageUrlDefaut);
   $("#driveurl").value=ls.get("pilotage_drive_url")||pilotageUrlDefaut;
   $("#drivesave").onclick=()=>{const v=$("#driveurl").value.trim();if(v&&!(v.startsWith("https://drive.google.com/")||v.startsWith("https://docs.google.com/spreadsheets/d/"))){toast("Collez un lien Google Drive ou Google Sheets valide");return}ls.set("pilotage_drive_url",v);toast(v?"Lien du pilotage enregistré":"Lien effacé")};
@@ -936,7 +936,7 @@ async function exportPilotage(){
   const syncUrl=ls.get("pilotage_sync_url");
   const syncTarget=syncUrl?"pilotage_sync_"+Date.now():"";
   const syncTab=syncUrl?window.open("about:blank",syncTarget):null;
-  const prospects=ents.filter(e=>!/^\d{9}$/.test(e.siren)||e.contact||e.mobile||e.fonction||e.notes||(e.devis||[]).length||e.refus||e.posTerrain);
+  const prospects=ents;
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
   for(let i=0;i<sansNaf.length;i+=3)await Promise.all(sansNaf.slice(i,i+3).map(rechercherNafPilotage));
