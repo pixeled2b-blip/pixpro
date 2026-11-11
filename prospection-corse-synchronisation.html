@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1e3a34">
+<title>Prospection Corse</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Page 1 : recherche de l'enseigne + bouton Cartographie. Fiche en questions. Carte colorée par état. */
+:root{
+  --bg:#f3f1ec; --card:#ffffff; --fg:#1d2522; --muted:#66706b; --line:#dcd8cf;
+  --accent:#1e5a4b; --accent-fg:#ffffff; --chip:#e7e3d9;
+  --c-client:#2f9e5a; --c-devis:#e8830c; --c-refus:#7b3fc4; --c-afaire:#5b6b7a; --late:#b3261e;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141917; --card:#1d2420; --fg:#e8ece9; --muted:#9aa6a0; --line:#2e3833;
+  --accent:#5fb89f; --accent-fg:#0d1512; --chip:#28322d; --late:#ff8a80; color-scheme:dark}}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.4 var(--font);display:flex;flex-direction:column;
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));
+  padding-top:env(safe-area-inset-top,0px);box-sizing:border-box;overflow:hidden}
+*{box-sizing:border-box}
+h1{font-size:18px;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+header{display:flex;align-items:center;gap:8px;padding:10px 0 6px}
+header .count{color:var(--muted);font-size:13px;margin-left:auto}
+main{flex:1;min-height:0;overflow-y:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch}
+nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--bg)}
+nav button{border:0;background:none;padding:8px 2px;border-radius:10px;color:var(--muted);font-size:13px;min-height:44px}
+nav button[aria-selected="true"]{background:var(--chip);color:var(--fg);font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 140px}
+.field>span{font-size:12px;color:var(--muted)}
+input,select,textarea{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0;width:100%}
+textarea{min-height:110px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 14px;min-height:44px}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+.btn.danger{color:var(--late)}
+.btn.small{min-height:36px;padding:6px 10px;font-size:13px}
+.btn.big{width:100%;min-height:56px;font-size:17px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.item{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.item .t{font-weight:600;overflow-wrap:anywhere}
+.item .s{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.badge{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--fg)}
+.badge.late{background:var(--late);color:#fff}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:2000;overflow-y:auto;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-left,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-right,0px))}
+.sheet h2{font-size:18px;margin:6px 0 0;overflow-wrap:anywhere}
+.sheet h3,main h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px}
+.sheet .bar{position:sticky;top:0;background:var(--bg);padding:6px 0;display:flex;gap:8px;align-items:center;z-index:2}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{border:2px solid var(--line);background:var(--card);border-radius:12px;min-height:52px;font-weight:600}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--chip)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;min-height:40px}
+.chip.on{border-color:var(--c-devis);background:var(--chip);font-weight:600}
+.devis{margin-bottom:10px;display:grid;gap:8px}
+.mono{font-variant-numeric:tabular-nums}
+#map{height:58vh;min-height:300px;border-radius:12px;z-index:0}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;margin:8px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(70px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;z-index:3000;max-width:90%}
+progress{width:100%;height:10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.lbl{display:flex;gap:6px;align-items:center}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.filters .wide{grid-column:1/-1}
+</style>
+</head>
+<body>
+<header><h1>Prospection Corse</h1><span class="count" id="count"></span></header>
+<main id="main"></main>
+<nav id="nav" role="tablist">
+  <button role="tab" data-tab="accueil" aria-selected="true">Accueil</button>
+  <button role="tab" data-tab="carte" aria-selected="false">Cartographie</button>
+  <button role="tab" data-tab="relances" aria-selected="false">Relances</button>
+  <button role="tab" data-tab="donnees" aria-selected="false">Données</button>
+</nav>
+<div id="sheet" class="sheet" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+"use strict";
+/* ---------- utilitaires ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today=()=>ymd(new Date());
+const eur=n=>(Number(n)||0).toLocaleString("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const uid=()=>Math.random().toString(36).slice(2,9);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function toast(msg,ms=3200){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),ms)}
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const fmtDate=s=>s?new Date(s+"T12:00:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}):"";
+function km(a,b,c,d){const R=6371000,t=x=>x*Math.PI/180,dl=t(c-a),dn=t(d-b);
+  const h=Math.sin(dl/2)**2+Math.cos(t(a))*Math.cos(t(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const fmtDist=m=>m<1000?Math.round(m)+" m":(m/1000).toFixed(1).replace(".",",")+" km";
+
+/* ---------- produits, états, couleurs ---------- */
+const PRODUITS=["TV hospitality","Écran LED","Écran intérieur","Écran extérieur","Halo","TBI","WiFi","Caméra","Alarme","Serrure connectée","Fibre"];
+const COL={client:"#2f9e5a",devis:"#e8830c",refus:"#7b3fc4",afaire:"#5b6b7a"};
+const LABEL={client:"Client",devis:"Devis fait",refus:"Pas de devis",afaire:"À faire"};
+/* état d'une fiche, global ou pour un produit */
+function etat(e,prod){
+  const ds=(e.devis||[]).filter(d=>!prod||d.produit===prod);
+  if(ds.some(d=>d.statut==="accepté"))return"client";
+  if(ds.some(d=>d.statut==="en cours"))return"devis";
+  if(ds.length)return"refus";
+  if(!prod&&e.refus)return"refus";
+  return"afaire";
+}
+
+/* ---------- NAF, TVA ---------- */
+const SECTIONS={A:"Agriculture, sylviculture, pêche",B:"Industries extractives",C:"Industrie manufacturière",D:"Énergie",E:"Eau, déchets",F:"Construction",G:"Commerce, réparation auto",H:"Transports, entreposage",I:"Hébergement et restauration",J:"Information, communication",K:"Finance, assurance",L:"Immobilier",M:"Services spécialisés, scientifiques, techniques",N:"Services administratifs",O:"Administration publique",P:"Enseignement",Q:"Santé, action sociale",R:"Arts, spectacles, loisirs",S:"Autres services",T:"Ménages employeurs",U:"Extraterritorial"};
+function sectionOf(naf){
+  const d=parseInt(String(naf||"").slice(0,2),10);if(!d)return"";
+  if(d<=3)return"A";if(d<=9)return"B";if(d<=33)return"C";if(d===35)return"D";if(d<=39)return"E";if(d<=43)return"F";
+  if(d<=47)return"G";if(d<=53)return"H";if(d<=56)return"I";if(d<=63)return"J";if(d<=66)return"K";if(d===68)return"L";
+  if(d<=75)return"M";if(d<=82)return"N";if(d===84)return"O";if(d===85)return"P";if(d<=88)return"Q";if(d<=93)return"R";
+  if(d<=96)return"S";if(d<=98)return"T";return"U";
+}
+const catLabel=e=>e.section?(e.section+" · "+SECTIONS[e.section]):"";
+function tvaFromSiren(siren){
+  if(!/^\d{9}$/.test(siren))return"";
+  return"FR"+pad((12+3*(Number(siren)%97))%97)+siren;
+}
+
+/* ---------- base locale (IndexedDB) ---------- */
+let idb;
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open("prospection-corse",1);
+  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("ent",{keyPath:"siren"});d.createObjectStore("meta")};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+const tx=(store,mode="readonly")=>idb.transaction(store,mode).objectStore(store);
+const reqP=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const dbAll=()=>reqP(tx("ent").getAll());
+function dbPutMany(list){return new Promise((res,rej)=>{const t=idb.transaction("ent","readwrite");const s=t.objectStore("ent");
+  list.forEach(x=>{const c=Object.assign({},x);delete c._new;delete c._poi;s.put(c)});t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+const dbDelete=k=>reqP(tx("ent","readwrite").delete(k));
+const metaGet=k=>reqP(tx("meta").get(k));
+const metaSet=(k,v)=>reqP(tx("meta","readwrite").put(v,k));
+
+/* ---------- état de l'appli ---------- */
+let ents=[],byId=new Map(),searchIdx=new Map();
+let tab="accueil";
+let pois=[],poiLayer=null,comp={status:"",cands:[],q:""};
+let me=null,watchId=null;                 // position GPS de l'utilisateur
+const MAPF={radius:0,prod:"",etat:""};   // filtres de la carte
+let mapView=null;
+
+function newEnt(o){
+  return Object.assign({siren:"",nom:"",adresse:"",cp:"",commune:"",dept:"",naf:"",section:"",tva:"",lat:null,lng:null,
+    tel:"",contact:"",fonction:"",mobile:"",notes:"",posTerrain:null,devis:[],refus:null,raison:"",siret:"",maj:""},o);
+}
+function index(e){searchIdx.set(e.siren,norm([e.nom,e.siren,e.commune,e.cp,e.naf,e.contact,e.adresse].join(" ")))}
+function saveEnt(e){e.maj=new Date().toISOString();index(e);return dbPutMany([e])}
+
+/* ---------- relances ---------- */
+function relanceInfo(e){
+  const dates=[];
+  (e.devis||[]).forEach(d=>{if(d.statut==="en cours"&&d.relance)dates.push(d.relance)});
+  if(e.refus&&e.refus.relance)dates.push(e.refus.relance);
+  if(!dates.length)return null;
+  const next=dates.sort()[0],t=today();
+  return{date:next,late:next<t,today:next===t};
+}
+const devisEnCours=e=>(e.devis||[]).filter(d=>d.statut==="en cours");
+function badges(e){
+  const b=[],r=relanceInfo(e),st=etat(e);
+  b.push(`<span class="badge"><span class="dot" style="background:${COL[st]}"></span>${LABEL[st]}</span>`);
+  const prods=[...new Set((e.devis||[]).map(d=>d.produit).filter(Boolean))];
+  if(prods.length)b.push(`<span class="badge">${esc(prods.join(", "))}</span>`);
+  if(r)b.push(`<span class="badge ${r.late?"late":""}">${r.late?"Relance en retard : ":r.today?"Relance aujourd'hui":"Relance : "}${r.today?"":fmtDate(r.date)}</span>`);
+  if(e.refus&&!e.refus.relance)b.push(`<span class="badge late">Date de relance manquante</span>`);
+  return b.join("");
+}
+
+/* ---------- reconnaissance vocale ---------- */
+function dictate(btn,getVal,setVal,onEnd){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast("Dictée non disponible sur ce navigateur (essayez Chrome ou Safari).");return}
+  if(btn._rec){btn._rec.stop();return}
+  const rec=new SR(),label=btn.textContent;rec.lang="fr-FR";rec.continuous=!onEnd;rec.interimResults=false;btn._rec=rec;
+  btn.textContent="■";
+  rec.onresult=ev=>{let t="";for(let i=ev.resultIndex;i<ev.results.length;i++)if(ev.results[i].isFinal)t+=ev.results[i][0].transcript+" ";
+    if(t){const c=getVal();setVal((c&&!/\s$/.test(c)?c+" ":c)+t.trim())}};
+  rec.onerror=ev=>toast(ev.error==="not-allowed"?"Micro refusé : autorisez-le dans les réglages du navigateur.":"Dictée interrompue ("+ev.error+")");
+  rec.onend=()=>{btn._rec=null;btn.textContent=label;if(onEnd)onEnd()};
+  try{rec.start()}catch(e){btn._rec=null;btn.textContent=label}
+}
+
+/* ---------- géolocalisation ---------- */
+function getPos(){return new Promise((res,rej)=>{
+  if(!navigator.geolocation)return rej(new Error("Géolocalisation indisponible"));
+  navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude,acc:Math.round(p.coords.accuracy),date:new Date().toISOString()}),
+    er=>rej(new Error(er.code===1?"Position refusée : autorisez la localisation pour ce site.":"Position introuvable.")),
+    {enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+
+/* ---------- recherche en ligne : SIREN/TVA (data.gouv) + téléphone/GPS (OpenStreetMap) ---------- */
+let onlineResults=[];
+const FORMES=/\b(sarl|sas|sasu|eurl|sci|sa|snc|scop|earl|selarl|societe|ste|entreprise|etablissements|ets)\b/gi;
+function enseigneOf(x){
+  const g=x.siege||{};
+  if(g.liste_enseignes&&g.liste_enseignes.length)return g.liste_enseignes[0];
+  const m=String(x.nom_complet||"").match(/\(([^)]+)\)/);return m?m[1]:"";
+}
+function enseignesOf(o){return [...(o.liste_enseignes||[]),o.nom_commercial].filter(Boolean)}
+/* établissement dont l'enseigne (nom commercial) ressemble le plus au nom cherché */
+function etabMatch(x,tk){
+  const list=[x.siege,...(x.matching_etablissements||[])].filter(Boolean);
+  let best=null,bs=-1;
+  list.forEach(o=>{const hay=norm(enseignesOf(o).join(" "));const sc=tk.length?tk.filter(w=>hay.includes(w)).length/tk.length:0;if(sc>bs){bs=sc;best=o}});
+  const et=best||x.siege||{};
+  return{etab:et,ens:bs>0?enseignesOf(et).join(", "):"",s:Math.max(bs,0)};
+}
+function legalScore(x,tk){const hay=norm(x.nom_complet+" "+(x.nom_raison_sociale||""));return tk.length?tk.filter(w=>hay.includes(w)).length/tk.length:0}
+function toks(s){return norm(s).replace(/[^a-z0-9]+/g," ").split(" ").filter(t=>t.length>2&&!/^(les|des|the|sarl|sas|sasu|eurl|sci|snc|cie|ets|societe|ste|sas)$/.test(t))}
+async function searchOnline(q){
+  const box=$("#registry");if(!box)return;
+  box.innerHTML=`<div class="card muted">Recherche de l'enseigne « ${esc(q)} » en Corse…</div>`;
+  try{
+    const tk=toks(q);
+    const rs=await Promise.all(["2A","2B"].map(d=>
+      fetch("https://recherche-entreprises.api.gouv.fr/search?q="+encodeURIComponent(q)+"&departement="+d+"&etat_administratif=A&per_page=8")
+        .then(r=>r.ok?r.json():{results:[]}).catch(()=>({results:[]}))));
+    const seen=new Set();
+    onlineResults=rs.flatMap((j,i)=>(j.results||[]).map(x=>({x,dept:["2A","2B"][i]})))
+      .filter(o=>!seen.has(o.x.siren)&&seen.add(o.x.siren))
+      .map(o=>{const m=etabMatch(o.x,tk);return Object.assign(o,{etab:m.etab,ens:m.ens,rank:m.s+0.4*legalScore(o.x,tk)})})
+      .sort((a,b)=>b.rank-a.rank).slice(0,10);
+    onlineResults.q=q;
+    box.innerHTML=(onlineResults.length?`<h3>Sociétés pouvant correspondre à « ${esc(q)} »</h3><div class="small muted" style="margin-bottom:6px">Touchez la bonne pour créer la fiche et la lier à cette société.</div>`+onlineResults.map((o,i)=>{
+      const x=o.x,g=o.etab||{};
+      return `<button class="item" data-pick="${i}"><div class="t">${esc(o.ens||q)}</div>
+        <div class="s">Société : ${esc(x.nom_complet||"")}</div>
+        <div class="s">${esc([g.adresse].filter(Boolean).join(""))}</div>
+        <div class="s mono">SIREN ${esc(x.siren)} · TVA ${esc(tvaFromSiren(String(x.siren)))}</div></button>`}).join("")
+      :`<div class="card muted">Aucune société liée à ce nom commercial. Créez la fiche à la main, puis cherchez la société depuis la fiche.</div>`)+
+      `<button class="btn" id="manual" style="width:100%">+ Créer la fiche « ${esc(q)} » sans société</button>`;
+    const mb=$("#manual");if(mb)mb.onclick=()=>openFiche(null,q);
+  }catch(er){box.innerHTML=`<div class="card">Recherche impossible : ${esc(er.message)}. Vérifiez la connexion.</div>`}
+}
+async function pickOnline(i){
+  const o=onlineResults[i];if(!o)return;
+  const x=o.x,g=o.etab||x.siege||{},siren=String(x.siren);
+  if(byId.has(siren)){openFiche(siren);return}
+  const naf=g.activite_principale||x.activite_principale||"";
+  const e=newEnt({siren,nom:o.ens||onlineResults.q||x.nom_complet||"",raison:x.nom_complet||"",siret:g.siret||"",
+    adresse:g.adresse?g.adresse.replace(/\s+\d{5}\s.*$/,""):"",cp:g.code_postal||"",
+    commune:g.libelle_commune||"",dept:o.dept,naf,section:x.section_activite_principale||sectionOf(naf),tva:tvaFromSiren(siren),
+    lat:g.latitude?+g.latitude:null,lng:g.longitude?+g.longitude:null});
+  ents.push(e);byId.set(siren,e);await saveEnt(e);
+  openFiche(siren);
+  lookupOSM(e,true);
+}
+/* ---------- page 1 : le commerce est cherché sur OpenStreetMap ---------- */
+let placeResults=[];
+const TYPE_WORDS=/\b(restaurant|resto|bar|cafe|brasserie|hotel|pizzeria|boulangerie|patisserie|pharmacie|snack|epicerie|magasin|boutique|salon|coiffeur|garage|supermarche|tabac|bureau)\b/gi;
+function placeVariants(q){
+  const t=q.trim().replace(/\s+/g," ");
+  const m=t.match(/^(.*?)\s+(?:à|a|au|sur|dans|en)\s+([^\s].*)$/i);
+  const name=m?m[1]:t,town=m?m[2]:"";
+  const bare=norm(name).replace(TYPE_WORDS," ").replace(/\s+/g," ").trim();
+  const v=[];
+  if(m)v.push(name+" "+town+" Corse");
+  v.push(t.replace(/\s(?:à|a)\s/gi," ")+" Corse");
+  if(m&&bare)v.push(bare+" "+town+" Corse");
+  if(bare)v.push(bare+" Corse");
+  return [...new Set(v.map(x=>x.trim()))];
+}
+function mapNom(p){
+  const a=p.address||{},t=p.extratags||{};
+  return{src:"osm",id:p.osm_type+p.osm_id,nom:(p.namedetails&&p.namedetails.name)||p.name||String(p.display_name||"").split(",")[0],
+    adresse:[a.house_number,a.road].filter(Boolean).join(" "),cp:a.postcode||"",commune:a.city||a.town||a.village||a.municipality||"",
+    tel:cleanPhone(t.phone||t["contact:phone"]||t.mobile||t["contact:mobile"]),lat:+p.lat,lng:+p.lon,type:p.type||""};
+}
+async function searchPlaces(q){
+  const box=$("#online");if(!box)return;
+  const reg=$("#registry");if(reg)reg.innerHTML="";
+  box.innerHTML=`<div class="card muted">Recherche de « ${esc(q)} » sur OpenStreetMap…</div>`;
+  let found=[],err="";
+  const vs=placeVariants(q);
+  for(let i=0;i<vs.length&&!found.length;i++){
+    try{
+      if(i)await sleep(1100);
+      const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&addressdetails=1&extratags=1&namedetails=1&accept-language=fr&countrycodes=fr&viewbox=8.5,43.1,9.65,41.3&bounded=1&q="+encodeURIComponent(vs[i]));
+      if(!r.ok){err="OpenStreetMap a répondu "+r.status;continue}
+      found=(await r.json()).filter(p=>OSM_OK.includes(p.category)).map(mapNom);
+    }catch(er){err=er.message}
+  }
+  placeResults=found;
+  if(!document.body.contains(box))return;
+  box.innerHTML=(found.length?`<h3>Trouvé sur OpenStreetMap</h3><div class="small muted" style="margin-bottom:6px">Touchez le bon commerce : la fiche est créée avec son adresse, puis la société est cherchée.</div>`+
+    found.map((p,i)=>`<button class="item" data-place="${i}"><div class="t">${esc(p.nom)}</div>
+      <div class="s">${esc([p.adresse,p.cp,p.commune].filter(Boolean).join(" "))||"Adresse non renseignée"}</div>
+      <div class="s">${esc(p.type)}${p.tel?" · "+esc(p.tel):""}</div></button>`).join("")
+    :`<div class="card muted">${err?"Recherche impossible : "+esc(err)+".":"Rien trouvé sur OpenStreetMap pour « "+esc(q)+" »."}</div>`)+
+    `<div class="row" style="margin-top:4px"><button class="btn small" id="regbtn">Chercher dans le registre des sociétés</button><button class="btn small" id="manual">Créer la fiche à la main</button></div>`;
+  $("#regbtn").onclick=()=>searchOnline(q);
+  $("#manual").onclick=()=>openFiche(null,q);
+}
+async function pickPlace(i){
+  const p=placeResults[i];if(!p)return;
+  const pt=toks(p.nom);
+  const dup=ents.find(e=>e.lat&&km(e.lat,e.lng,p.lat,p.lng)<30&&toks(e.nom).some(w=>pt.includes(w)));
+  if(dup){openFiche(dup.siren);toast("Cette fiche existe déjà dans votre base");return}
+  const e=newEnt({siren:"P"+Date.now().toString(36).toUpperCase(),nom:p.nom,adresse:p.adresse,cp:p.cp,commune:p.commune,tel:p.tel,lat:p.lat,lng:p.lng,dept:deptFromCp(p.cp)});
+  ents.push(e);byId.set(e.siren,e);await saveEnt(e);
+  openFiche(e.siren);
+  findCompany(e,false);
+}
+const OSM_OK=["shop","amenity","tourism","office","craft","leisure","healthcare"];
+const cleanPhone=p=>String(p||"").split(";")[0].trim().replace(/^\+33\s?/,"0");
+async function lookupOSM(e,silent){
+  const ens=(String(e.nom).match(/\(([^)]+)\)/)||[])[1]||"";
+  const base=String(e.nom).replace(/\([^)]*\)/g,"").replace(FORMES,"").trim();
+  const qs=[...new Set([ens&&ens+" "+e.commune,base+" "+e.commune,ens,base].filter(s=>s&&s.trim().length>2))];
+  if(!silent)toast("Recherche du téléphone et du point GPS…");
+  for(const q of qs){
+    try{
+      const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&extratags=1&accept-language=fr&countrycodes=fr&viewbox=8.5,43.1,9.65,41.3&bounded=1&q="+encodeURIComponent(q+" Corse"));
+      if(r.ok){
+        const arr=(await r.json()).filter(p=>OSM_OK.includes(p.category));
+        const hit=arr.find(p=>p.extratags&&(p.extratags.phone||p.extratags["contact:phone"]||p.extratags.mobile||p.extratags["contact:mobile"]))||arr[0];
+        if(hit){
+          const t=hit.extratags||{},ph=cleanPhone(t.phone||t["contact:phone"]||t.mobile||t["contact:mobile"]);
+          e.lat=+hit.lat;e.lng=+hit.lon;if(ph&&!e.tel)e.tel=ph;
+          await saveEnt(e);
+          if(cur===e&&!$("#sheet").hidden)renderFiche();
+          toast(ph?"Téléphone et point GPS trouvés (OpenStreetMap)":"Point GPS trouvé, téléphone non référencé : à saisir");
+          return true;
+        }
+      }
+    }catch(er){}
+    await sleep(1100);
+  }
+  toast("Aucune correspondance OpenStreetMap : saisissez le téléphone, ou relevez votre position sur place.",4500);
+  return false;
+}
+
+/* ---------- navigation ---------- */
+function setTab(t){
+  if(t!=="carte")stopWatch();
+  tab=t;document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t));
+  render();
+}
+function render(){
+  $("#count").textContent=ents.length.toLocaleString("fr-FR")+" fiches";
+  const m=$("#main");
+  if(tab==="accueil")viewAccueil(m);else if(tab==="carte")viewCarte(m);else if(tab==="relances")viewRelances(m);else viewDonnees(m);
+}
+function itemHTML(e,extra){
+  return `<button class="item" data-open="${esc(e.siren)}"><div class="t">${esc(e.nom||"(sans nom)")}${extra?` <span class="muted small">· ${esc(extra)}</span>`:""}</div>
+    <div class="s">${esc([e.adresse,e.cp,e.commune].filter(Boolean).join(" "))}</div>
+    <div class="s">${esc(e.naf)} ${esc(SECTIONS[e.section]||"")}${e.tel?" · "+esc(e.tel):""}</div>
+    <div class="badges">${badges(e)}</div></button>`;
+}
+
+/* ---------- page 1 : recherche de l'enseigne ---------- */
+let accQ="";
+function viewAccueil(m){
+  m.innerHTML=`
+  <h3 style="margin-top:8px">Commerce à chercher (nom et ville)</h3>
+  <div class="row" style="flex-wrap:nowrap"><input id="aq" type="search" placeholder="Ex. : restaurant chez Vincent à Bastia" value="${esc(accQ)}" autocomplete="off" enterkeyhint="search">
+    <button class="btn" id="amic" type="button" aria-label="Dicter">🎤</button></div>
+  <button class="btn primary" id="aseek" style="width:100%;margin-top:8px">Chercher le commerce</button>
+  <div id="local" style="margin-top:10px"></div>
+  <div id="online" style="margin-top:6px"></div>
+  <div id="registry" style="margin-top:6px"></div>
+  <button class="btn big" id="tomap" style="margin-top:14px">🗺 Cartographie</button>
+  <div id="rel"></div>`;
+  const drawLocal=()=>{
+    const q=norm(accQ).trim(),parts=q?q.split(/\s+/):[];
+    const box=$("#local");
+    if(!parts.length){box.innerHTML="";return}
+    const list=ents.filter(e=>{const s=searchIdx.get(e.siren)||"";return parts.every(p=>s.includes(p))}).slice(0,15);
+    box.innerHTML=list.length?`<h3>Déjà dans votre base</h3>`+list.map(e=>itemHTML(e)).join(""):"";
+  };
+  const seek=()=>{const q=accQ.trim();if(q.length<2){toast("Saisissez au moins 2 lettres");return}searchPlaces(q)};
+  $("#aq").oninput=e=>{accQ=e.target.value;drawLocal()};
+  $("#aq").onkeydown=e=>{if(e.key==="Enter")seek()};
+  $("#aseek").onclick=seek;
+  $("#amic").onclick=e=>dictate(e.currentTarget,()=>$("#aq").value,v=>{$("#aq").value=v;accQ=v;drawLocal()},()=>{drawLocal();if(accQ.trim().length>1)seek()});
+  $("#tomap").onclick=()=>setTab("carte");
+  const due=ents.filter(e=>{const r=relanceInfo(e);return r&&(r.late||r.today)});
+  $("#rel").innerHTML=due.length?`<h3>À relancer (${due.length})</h3>`+due.slice(0,8).map(e=>itemHTML(e)).join("")+(due.length>8?`<button class="btn" data-go="relances" style="width:100%">Voir toutes les relances</button>`:""):"";
+  drawLocal();
+}
+function viewRelances(m){
+  const list=ents.filter(e=>relanceInfo(e)).sort((a,b)=>relanceInfo(a).date.localeCompare(relanceInfo(b).date));
+  const noDate=ents.filter(e=>e.refus&&!e.refus.relance);
+  m.innerHTML=`<p class="muted small">Aujourd'hui : ${fmtDate(today())}</p>`+
+    (noDate.length?`<h3>Pas de devis, sans date de relance</h3>`+noDate.map(e=>itemHTML(e)).join(""):"")+
+    (list.length?list.map(e=>itemHTML(e)).join(""):`<div class="card">Aucune relance planifiée.</div>`);
+}
+
+/* ---------- cartographie ---------- */
+let map,layer,meMarker,meCircle,centered=false,listTimer=null;
+function stopWatch(){if(watchId!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watchId)}watchId=null}
+function startWatch(){
+  if(watchId!==null||!navigator.geolocation)return;
+  watchId=navigator.geolocation.watchPosition(p=>{
+    me={lat:p.coords.latitude,lng:p.coords.longitude,acc:Math.round(p.coords.accuracy)};
+    if(tab!=="carte"||!map)return;
+    drawMe();
+    if(!centered){centered=true;map.setView([me.lat,me.lng],15)}
+    clearTimeout(listTimer);listTimer=setTimeout(()=>{drawMarkers()},800);
+  },er=>{toast(er.code===1?"Position refusée : autorisez la localisation pour voir où vous êtes.":"Position introuvable.")},
+  {enableHighAccuracy:true,maximumAge:5000,timeout:30000});
+}
+function drawMe(){
+  if(!map||!me)return;
+  if(meMarker)meMarker.remove();if(meCircle)meCircle.remove();
+  meCircle=L.circle([me.lat,me.lng],{radius:Math.max(me.acc,10),color:"#1565c0",weight:1,fillColor:"#1565c0",fillOpacity:.12,interactive:false}).addTo(map);
+  meMarker=L.marker([me.lat,me.lng],{zIndexOffset:1000,icon:L.divIcon({className:"",iconSize:[22,22],iconAnchor:[11,11],
+    html:'<div style="width:22px;height:22px;border-radius:50%;background:#1565c0;border:3px solid #fff;box-shadow:0 0 0 2px #1565c0"></div>'})}).addTo(map).bindTooltip("Vous êtes ici");
+}
+function viewCarte(m){
+  m.innerHTML=`
+  <div class="filters">
+    <select id="mrad" aria-label="Rayon">${[[0,"Toute la Corse"],[300,"Rayon 300 m"],[500,"Rayon 500 m"],[1000,"Rayon 1 km"],[2000,"Rayon 2 km"],[5000,"Rayon 5 km"],[10000,"Rayon 10 km"]].map(([v,l])=>`<option value="${v}"${MAPF.radius===v?" selected":""}>${l}</option>`).join("")}</select>
+    <select id="metat" aria-label="État"><option value="">Tous les états</option>${Object.keys(LABEL).map(k=>`<option value="${k}"${MAPF.etat===k?" selected":""}>${LABEL[k]}</option>`).join("")}</select>
+    <select id="mprod" class="wide" aria-label="Catégorie"><option value="">Tous les produits</option>${PRODUITS.map(p=>`<option${MAPF.prod===p?" selected":""}>${esc(p)}</option>`).join("")}</select>
+  </div>
+  <div id="map"></div>
+  <div class="legend" id="legend"></div>
+  <div class="row" style="margin-bottom:8px"><button class="btn small" id="locate">📍 Me centrer</button><button class="btn small" id="osmzone">🔎 Commerces de la zone</button><button class="btn small" id="gzone">Google</button></div>
+  <div class="muted small" id="mapinfo" style="margin-bottom:6px"></div>
+  <div id="poilist"></div>
+  <div id="near"></div>`;
+  if(map){try{mapView={c:map.getCenter(),z:map.getZoom()};map.remove()}catch(e){}map=null}
+  map=L.map("map",{preferCanvas:true});
+  if(mapView)map.setView(mapView.c,mapView.z);else map.setView([42.15,9.1],8);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+  poiLayer=L.layerGroup().addTo(map);
+  map.on("moveend",()=>{mapView={c:map.getCenter(),z:map.getZoom()}});
+  centered=!!mapView;
+  $("#mrad").onchange=e=>{MAPF.radius=+e.target.value;drawMarkers()};
+  $("#metat").onchange=e=>{MAPF.etat=e.target.value;drawMarkers()};
+  $("#mprod").onchange=e=>{MAPF.prod=e.target.value;drawMarkers()};
+  $("#osmzone").onclick=()=>loadPois("osm");
+  $("#gzone").onclick=()=>loadPois("google");
+  $("#locate").onclick=async()=>{try{const p=await getPos();me=p;drawMe();map.setView([p.lat,p.lng],16);drawMarkers()}catch(er){toast(er.message)}};
+  drawMe();startWatch();drawMarkers();drawPois();
+  setTimeout(()=>map&&map.invalidateSize(),100);
+}
+function drawMarkers(){
+  if(!map||tab!=="carte")return;
+  layer.clearLayers();
+  const prod=MAPF.prod;
+  let list=ents.filter(e=>e.lat&&e.lng);
+  if(MAPF.radius&&me)list=list.filter(e=>km(me.lat,me.lng,e.lat,e.lng)<=MAPF.radius);
+  const withState=list.map(e=>({e,s:etat(e,prod)}));
+  const counts={client:0,devis:0,refus:0,afaire:0};withState.forEach(o=>counts[o.s]++);
+  const shown=withState.filter(o=>!MAPF.etat||o.s===MAPF.etat);
+  const cap=6000;
+  // les fiches faites passent au-dessus des prospects à faire
+  shown.sort((a,b)=>(a.s==="afaire"?0:1)-(b.s==="afaire"?0:1)).slice(0,cap).forEach(({e,s})=>{
+    L.circleMarker([e.lat,e.lng],{radius:s==="afaire"?5:8,color:"#fff",weight:1,fillColor:COL[s],fillOpacity:.95})
+      .bindTooltip(e.nom||e.siren).on("click",()=>openFiche(e.siren)).addTo(layer);
+  });
+  $("#legend").innerHTML=Object.keys(LABEL).map(k=>`<span><span class="dot" style="background:${COL[k]}"></span>${LABEL[k]} ${counts[k]}</span>`).join("")+`<span><span class="dot" style="background:#fff;border:2px solid #333;width:6px;height:6px"></span>Trouvé sur internet</span>`;
+  const extra=MAPF.radius&&!me?" · activez la localisation pour le rayon":"";
+  $("#mapinfo").textContent=list.length.toLocaleString("fr-FR")+" commerces localisés"+(shown.length>cap?" (6000 affichés)":"")+extra;
+  // liste des prospects à faire les plus proches
+  const near=$("#near");
+  if(!me){near.innerHTML=`<div class="card muted small">Autorisez la localisation pour lister les prospects à faire autour de vous.</div>`;return}
+  const todo=withState.filter(o=>o.s==="afaire").map(o=>({e:o.e,d:km(me.lat,me.lng,o.e.lat,o.e.lng)})).sort((a,b)=>a.d-b.d).slice(0,25);
+  near.innerHTML=`<h3>Prospects à faire les plus proches${prod?" · "+esc(prod):""}</h3>`+(todo.length?todo.map(o=>itemHTML(o.e,fmtDist(o.d))).join(""):`<div class="card muted small">Rien à faire dans cette zone.</div>`);
+}
+
+/* ---------- commerces trouvés sur internet (OpenStreetMap, Google Places) ---------- */
+const POI_MIN_ZOOM=14;
+function poiKnown(p){
+  const pt=toks(p.nom);
+  return ents.some(e=>e.lat&&e.lng&&Math.abs(e.lat-p.lat)<0.0005&&Math.abs(e.lng-p.lng)<0.0007&&km(e.lat,e.lng,p.lat,p.lng)<40&&toks(e.nom).some(w=>pt.includes(w)));
+}
+function deptFromCp(cp){const c=String(cp||"");return /^20[01]/.test(c)?"2A":/^20[2-6]/.test(c)?"2B":""}
+async function fetchOsmPois(){
+  if(map.getZoom()<POI_MIN_ZOOM){toast("Zoomez davantage (quartier ou rue) pour lister les commerces.");return null}
+  const b=map.getBounds(),bb=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(5)).join(",");
+  const q='[out:json][timeout:25];('+
+    'nwr["name"]["shop"]('+bb+');'+
+    'nwr["name"]["amenity"~"^(restaurant|cafe|bar|fast_food|pub|bank|pharmacy|ice_cream|dentist|doctors|clinic|veterinary|car_rental|cinema|nightclub|post_office)$"]('+bb+');'+
+    'nwr["name"]["office"]('+bb+');nwr["name"]["craft"]('+bb+');'+
+    'nwr["name"]["tourism"~"^(hotel|guest_house|apartment|hostel|motel|camp_site|museum|gallery|chalet)$"]('+bb+'););out center tags 500;';
+  toast("Recherche des commerces de la zone…");
+  const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(q)});
+  if(!r.ok)throw new Error("Overpass "+r.status+", réessayez dans un instant");
+  const j=await r.json();
+  return (j.elements||[]).map(el=>{
+    const t=el.tags||{},c=el.center||el;if(!c.lat||!t.name)return null;
+    return{src:"osm",id:el.type+el.id,nom:t.name,adresse:[t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" "),
+      cp:t["addr:postcode"]||"",commune:t["addr:city"]||"",tel:cleanPhone(t.phone||t["contact:phone"]||t.mobile||t["contact:mobile"]),
+      lat:c.lat,lng:c.lon,type:t.shop||t.amenity||t.office||t.craft||t.tourism||""};
+  }).filter(Boolean);
+}
+async function fetchGooglePois(){
+  const key=ls.get("google_key");
+  if(!key){toast("Ajoutez d'abord votre clé Google Places dans l'onglet Données.");return null}
+  const c=map.getCenter(),b=map.getBounds();
+  const radius=Math.round(Math.min(Math.max(km(c.lat,c.lng,b.getNorth(),c.lng),100),3000));
+  toast("Interrogation de Google…");
+  const r=await fetch("https://places.googleapis.com/v1/places:searchNearby",{method:"POST",
+    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,
+      "X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.primaryTypeDisplayName"},
+    body:JSON.stringify({locationRestriction:{circle:{center:{latitude:c.lat,longitude:c.lng},radius:radius}},maxResultCount:20,languageCode:"fr"})});
+  if(!r.ok){let m="";try{m=(await r.json()).error.message}catch(e){}throw new Error("Google "+r.status+(m?" : "+m:""))}
+  const j=await r.json();
+  return (j.places||[]).map(p=>{
+    const parts=String(p.formattedAddress||"").split(",").map(x=>x.trim());
+    const m=parts.slice(1).join(" ").match(/(\d{5})\s+([^,]+)/);
+    return{src:"google",id:p.id,nom:(p.displayName||{}).text||"",adresse:parts[0]||"",cp:m?m[1]:"",commune:m?m[2].trim():"",
+      tel:p.nationalPhoneNumber||"",lat:p.location.latitude,lng:p.location.longitude,type:(p.primaryTypeDisplayName||{}).text||""};
+  });
+}
+async function loadPois(src){
+  if(!map)return;
+  try{
+    const list=src==="google"?await fetchGooglePois():await fetchOsmPois();
+    if(!list)return;
+    const have=new Set(pois.map(p=>p.src+p.id));let n=0;
+    list.forEach(p=>{if(p.nom&&!have.has(p.src+p.id)&&!poiKnown(p)){pois.push(p);have.add(p.src+p.id);n++}});
+    drawPois();
+    toast(n+" commerce(s) ajouté(s) à la carte"+(list.length>n?" ("+(list.length-n)+" déjà dans votre base)":""));
+  }catch(er){toast("Recherche impossible : "+er.message,5000)}
+}
+function drawPois(){
+  if(!map||!poiLayer)return;
+  poiLayer.clearLayers();
+  pois.forEach((p,i)=>L.circleMarker([p.lat,p.lng],{radius:7,color:"#333",weight:2.5,fillColor:"#fff",fillOpacity:1})
+    .bindTooltip(p.nom).on("click",()=>pickPoi(i)).addTo(poiLayer));
+  const box=$("#poilist");if(!box)return;
+  if(!pois.length){box.innerHTML="";return}
+  const o=me||{lat:map.getCenter().lat,lng:map.getCenter().lng};
+  const sorted=pois.map((p,i)=>({p,i,d:km(o.lat,o.lng,p.lat,p.lng)})).sort((a,b)=>a.d-b.d).slice(0,30);
+  box.innerHTML=`<h3>Commerces trouvés sur internet (${pois.length})</h3>`+sorted.map(({p,i,d})=>
+    `<button class="item" data-poi="${i}"><div class="t">${esc(p.nom)} <span class="muted small">· ${fmtDist(d)}</span></div>
+     <div class="s">${esc([p.adresse,p.cp,p.commune].filter(Boolean).join(" "))}</div>
+     <div class="s">${esc(p.type)}${p.tel?" · "+esc(p.tel):""} · ${p.src==="google"?"Google":"OpenStreetMap"}</div></button>`).join("");
+}
+async function reverseFill(e){
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=fr&zoom=18&lat="+e.lat+"&lon="+e.lng);
+    if(!r.ok)return;const a=(await r.json()).address||{};
+    if(!e.adresse)e.adresse=[a.house_number,a.road].filter(Boolean).join(" ");
+    if(!e.cp)e.cp=a.postcode||"";
+    if(!e.commune)e.commune=a.city||a.town||a.village||a.municipality||"";
+  }catch(er){}
+}
+async function pickPoi(i){
+  const p=pois[i];if(!p)return;
+  const e=newEnt({siren:"P"+Date.now().toString(36).toUpperCase(),nom:p.nom,adresse:p.adresse,cp:p.cp,commune:p.commune,tel:p.tel,lat:p.lat,lng:p.lng,dept:deptFromCp(p.cp)});
+  e._new=true;e._poi=true;
+  openFiche(null,null,e);
+  if(!e.commune||!e.cp||!e.adresse){await reverseFill(e);if(cur===e){e.dept=e.dept||deptFromCp(e.cp);renderFiche()}}
+  if(cur===e)findCompany(e,false);
+}
+
+/* ---------- recherche de la société et insertion ---------- */
+function addrScore(e,g){
+  const ea=norm(e.adresse),ga=norm((g&&g.adresse)||"");if(!ea||!ga)return 0;
+  const num=(ea.match(/^\d+/)||[""])[0];
+  const st=toks(ea.replace(/^\d+\s*(bis|ter)?\s*/,"")).filter(w=>!/^(rue|avenue|boulevard|place|quai|chemin|route|cours|impasse|allee|residence|lotissement)$/.test(w));
+  if(!st.length||!st.every(w=>ga.includes(w)))return 0;
+  return num&&new RegExp("(^|\\s)"+num+"(\\s|$)").test(ga)?1:0.5;
+}
+async function findCompany(e,auto,custom){
+  const base=custom||String(e.nom).replace(/\([^)]*\)/g,"").trim();
+  if(base.length<2){toast("Saisissez le nom à chercher");return}
+  comp={status:"busy",cands:[],q:base};paintComp();
+  const get=async url=>{try{const r=await fetch(url);return r.ok?(await r.json()).results||[]:[]}catch(er){return[]}};
+  try{
+    const out=[],tk=toks(base),B="https://recherche-entreprises.api.gouv.fr/search?etat_administratif=A&per_page=8&";
+    for(const d of ["2A","2B"]){
+      let rs=await get(B+"q="+encodeURIComponent(base)+"&departement="+d+(e.cp&&!custom?"&code_postal="+e.cp:""));
+      if(!rs.length&&e.cp&&!custom)rs=await get(B+"q="+encodeURIComponent(base)+"&departement="+d);
+      rs.forEach(x=>out.push({x,d}));
+    }
+    if(e.adresse&&e.cp){ // la société installée à l'adresse du commerce
+      (await get(B+"q="+encodeURIComponent(e.adresse)+"&code_postal="+e.cp)).forEach(x=>out.push({x,d:deptFromCp(e.cp)||e.dept||""}));
+    }
+    const seen=new Set();
+    const cands=out.filter(o=>!seen.has(o.x.siren)&&seen.add(o.x.siren)).map(({x,d})=>{
+      const m=etabMatch(x,tk),list=[x.siege,...(x.matching_etablissements||[])].filter(Boolean);
+      let ba=0,be=null;list.forEach(g=>{const sc=addrScore(e,g);if(sc>ba){ba=sc;be=g}});
+      const g=ba>0?be:m.etab;
+      const loc=!!((e.commune&&norm(g.libelle_commune)===norm(e.commune))||(e.cp&&g.code_postal===e.cp));
+      return{x,d:d||deptFromCp(g.code_postal),etab:g,ens:m.ens,loc,addr:ba,rank:m.s+0.4*legalScore(x,tk)+(loc?0.4:0)+1.2*ba};
+    }).sort((a,b)=>b.rank-a.rank);
+    comp={status:"done",cands:cands.slice(0,6),q:base};
+    if(cur===e)paintComp();
+  }catch(er){comp={status:"done",cands:[],q:base};if(cur===e){paintComp();toast("Recherche impossible : "+er.message,4500)}}
+}
+async function linkCompany(e,x,dept,etab){
+  const g=etab||x.siege||{},siren=String(x.siren),naf=g.activite_principale||x.activite_principale||"";
+  const old=e.siren;
+  const ex=byId.get(siren);
+  if(ex&&ex!==e){
+    // la société est déjà dans la base : on y reporte le point GPS du commerce et le téléphone
+    if(e.lat){ex.lat=e.lat;ex.lng=e.lng}
+    if(e.tel&&!ex.tel)ex.tel=e.tel;
+    if(e.posTerrain&&!ex.posTerrain)ex.posTerrain=e.posTerrain;
+    if(!ex.raison)ex.raison=x.nom_complet||"";
+    if(!ex.siret)ex.siret=g.siret||(x.siege||{}).siret||"";
+    if(!e._new){await dbDelete(old);byId.delete(old);const k=ents.indexOf(e);if(k>=0)ents.splice(k,1)}
+    await saveEnt(ex);cur=ex;comp={status:"linked",cands:[],q:""};renderFiche();
+    toast("Fiche existante mise à jour : SIREN "+siren);return;
+  }
+  e.raison=x.nom_complet||"";e.siret=g.siret||(x.siege||{}).siret||"";
+  e.siren=siren;e.tva=tvaFromSiren(siren);e.naf=naf;e.section=x.section_activite_principale||sectionOf(naf);
+  e.dept=dept||e.dept||deptFromCp(g.code_postal);
+  if(!e.adresse){e.adresse=g.adresse?g.adresse.replace(/\s+\d{5}\s.*$/,""):"";e.cp=e.cp||g.code_postal||"";e.commune=e.commune||g.libelle_commune||""}
+  if(!e.lat&&g.latitude){e.lat=+g.latitude;e.lng=+g.longitude}
+  if(e._new){delete e._new;delete e._poi;ents.push(e);byId.set(siren,e)}
+  else{await dbDelete(old);byId.delete(old);byId.set(siren,e)}
+  await saveEnt(e);
+  comp={status:"linked",cands:[],q:""};
+  if(cur===e)renderFiche();
+  toast("Société insérée : SIREN "+siren+" · TVA "+e.tva,4500);
+}
+function paintComp(){
+  const box=$("#compbox");if(!box||!cur)return;
+  if(comp.status==="busy"){box.innerHTML=`<div class="muted small">Recherche de la société (adresse et nom)…</div>`;return}
+  const list=comp.cands.map((c,i)=>`<button class="item" data-link="${i}"><div class="t">${esc(c.x.nom_complet||"")}</div>
+    ${c.ens?`<div class="s">Nom commercial : ${esc(c.ens)}</div>`:""}
+    <div class="s">${esc((c.etab||{}).adresse||"")}</div>
+    <div class="s mono">SIRET ${esc((c.etab||{}).siret||(c.x.siege||{}).siret||"")} · TVA ${esc(tvaFromSiren(String(c.x.siren)))}</div>
+    <div class="badges">${c.addr>=1?'<span class="badge">Même adresse</span>':c.addr>0?'<span class="badge">Même rue</span>':c.loc?'<span class="badge">Même commune</span>':""}</div></button>`).join("");
+  box.innerHTML=(comp.status==="done"?(list?`<div class="small muted" style="margin-bottom:6px">Touchez la société du commerce pour récupérer SIRET et TVA :</div>`+list:`<div class="small muted" style="margin-bottom:6px">Aucune société trouvée. Saisissez le nom de la société ci-dessus, puis relancez.</div>`):`<div class="small muted" style="margin-bottom:6px">Cherche la société à l'adresse du commerce (SIRET, TVA).</div>`)+
+    `<button class="btn small" id="c_go">Chercher SIRET et TVA</button>`;
+  box.querySelectorAll("[data-link]").forEach(b=>b.onclick=()=>{const c=comp.cands[+b.dataset.link];linkCompany(cur,c.x,c.d,c.etab)});
+  $("#c_go").onclick=()=>findCompany(cur,false,(($("#f_raison")||{}).value||"").trim());
+}
+
+/* ---------- fiche ---------- */
+let cur=null;
+function openFiche(siren,name,pre){
+  comp={status:"",cands:[],q:""};
+  if(pre){cur=pre}
+  else if(siren){cur=byId.get(siren)}
+  else{cur=newEnt({siren:"N"+Date.now().toString(36).toUpperCase(),nom:name||""});cur._new=true}
+  if(!cur)return;
+  renderFiche();$("#sheet").hidden=false;$("#sheet").scrollTop=0;
+}
+function closeFiche(){
+  if(cur&&cur._new){
+    const used=/^\d{9}$/.test(cur.siren)||(cur.devis||[]).length||cur.refus||cur.notes||cur.contact||cur.mobile;
+    if(cur.nom.trim()&&(!cur._poi||used)){delete cur._new;delete cur._poi;ents.push(cur);byId.set(cur.siren,cur);saveEnt(cur)}
+  }
+  $("#sheet").hidden=true;cur=null;render();
+}
+const demande=e=>e.refus?"non":(e.devis&&e.devis.length?"oui":(e._oui?"oui":""));
+function renderFiche(){
+  const e=cur,dm=demande(e),st=etat(e),real=/^\d{9}$/.test(e.siren);
+  const counts={};(e.devis||[]).forEach(d=>counts[d.produit]=(counts[d.produit]||0)+1);
+  const prodOpts=sel=>PRODUITS.concat(sel&&!PRODUITS.includes(sel)?[sel]:[]).map(p=>`<option${p===sel?" selected":""}>${esc(p)}</option>`).join("");
+  const keep=document.activeElement&&document.activeElement.id;
+  $("#sheet").innerHTML=`
+  <div class="bar"><button class="btn small" id="close">← Retour</button><span class="muted small" id="saved"></span></div>
+  ${e._new?`<input id="f_nom" placeholder="Nom commercial (enseigne)" value="${esc(e.nom)}" style="margin-top:6px">`:`<h2>${esc(e.nom)}</h2>`}
+  <div class="small muted">Nom commercial</div>
+  <div class="small muted">${esc(catLabel(e))}${e.naf?" · NAF "+esc(e.naf):""}</div>
+  <div class="badges"><span class="badge"><span class="dot" style="background:${COL[st]}"></span>${LABEL[st]}</span></div>
+
+  <h3>Société</h3>
+  <div class="card">
+    <label class="field"><span>Nom de la société</span><input id="f_raison" value="${esc(e.raison)}" placeholder="Raison sociale"></label>
+    ${real?`<div class="small mono" style="margin-top:8px">SIREN ${esc(e.siren)}<br>SIRET ${esc(e.siret||"non renseigné")}<br>TVA intracommunautaire ${esc(e.tva)}</div>`:`<div id="compbox" style="margin-top:8px"></div>`}
+  </div>
+
+  <h3>Le client veut-il un devis ?</h3>
+  <div class="seg"><button id="d_oui" aria-pressed="${dm==="oui"}">Oui</button><button id="d_non" aria-pressed="${dm==="non"}">Pas de devis demandé</button></div>
+  ${dm==="oui"?`
+    <p class="small muted" style="margin:12px 0 6px">Produits proposés (touchez pour ajouter un devis)</p>
+    <div class="chips">${PRODUITS.map(p=>`<button class="chip${counts[p]?" on":""}" data-add="${esc(p)}">${esc(p)}${counts[p]?" · "+counts[p]:""}</button>`).join("")}</div>
+    <div id="devislist" style="margin-top:12px">${(e.devis||[]).map((d,i)=>`
+      <div class="card devis" data-i="${i}">
+        <div class="row">
+          <label class="field"><span>Produit</span><select data-k="produit">${prodOpts(d.produit)}</select></label>
+          <label class="field"><span>Montant HT (€)</span><input data-k="montant" type="number" inputmode="decimal" min="0" step="any" value="${esc(d.montant)}"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Relancer le</span><input data-k="relance" type="date" value="${esc(d.relance)}"></label>
+          <label class="field"><span>Statut</span><select data-k="statut">${["en cours","accepté","refusé"].map(s=>`<option${d.statut===s?" selected":""}>${s}</option>`).join("")}</select></label>
+        </div>
+        ${d.statut==="en cours"&&!d.relance?`<div class="small" style="color:var(--late)">Indiquez quand relancer ce devis.</div>`:""}
+        <button class="btn small danger" data-del="${i}" style="justify-self:start">Supprimer ce devis</button>
+      </div>`).join("")||`<div class="card muted small">Choisissez un produit ci-dessus.</div>`}</div>
+    ${(e.devis||[]).length?`<div class="small muted">Devis en cours : <b>${eur(devisEnCours(e).reduce((a,d)=>a+(Number(d.montant)||0),0))} HT</b></div>`:""}`:""}
+  ${dm==="non"?`<div class="card" style="margin-top:10px"><div class="row">
+      <label class="field"><span>Date de relance (obligatoire)</span><input id="f_refdate" type="date" value="${esc(e.refus.relance)}"></label>
+      <label class="field"><span>Motif</span><input id="f_refmotif" value="${esc(e.refus.motif)}"></label></div>
+      ${e.refus.relance?"":`<div class="small" style="color:var(--late);margin-top:6px">Indiquez quand relancer ce client.</div>`}</div>`:""}
+
+  <h3>Compte rendu</h3>
+  <textarea id="f_notes" placeholder="Ce qui s'est dit, besoins, prochaine étape">${esc(e.notes)}</textarea>
+  <div class="row" style="margin-top:6px"><button class="btn" id="dict">🎤 Dicter</button></div>
+
+  <h3>Point GPS</h3>
+  <div class="card">
+    <div class="small">Commerce : <span class="mono">${e.lat?e.lat.toFixed(5)+", "+e.lng.toFixed(5):"non renseigné"}</span></div>
+    <div class="small" style="margin-top:4px">Ma position relevée : <span class="mono">${e.posTerrain?`${e.posTerrain.lat.toFixed(5)}, ${e.posTerrain.lng.toFixed(5)} · ±${e.posTerrain.acc} m · ${esc(fmtDate(e.posTerrain.date.slice(0,10)))}`:"aucune"}</span></div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="gps">📍 Relever ma position</button>
+    ${e.posTerrain?`<button class="btn" id="gps2">Utiliser comme point du commerce</button>`:""}</div>
+  </div>
+
+  <h3>Coordonnées</h3>
+  <div class="card row">
+    <label class="field"><span>Téléphone</span><input id="f_tel" type="tel" value="${esc(e.tel)}" inputmode="tel"></label>
+    <a class="btn primary" id="call" style="text-decoration:none;display:inline-flex;align-items:center" href="tel:${esc((e.tel||"").replace(/\s/g,""))}">📞 Appeler</a>
+    <label class="field"><span>Portable du contact</span><input id="f_mobile" type="tel" value="${esc(e.mobile)}" inputmode="tel"></label>
+    <label class="field"><span>Contact</span><input id="f_contact" value="${esc(e.contact)}"></label>
+    <label class="field"><span>Fonction</span><input id="f_fonction" value="${esc(e.fonction)}"></label>
+    <label class="field" style="flex-basis:100%"><span>Adresse</span><input id="f_adresse" value="${esc([e.adresse,e.cp,e.commune].filter(Boolean).join(" "))}"></label>
+    ${e._new?"":`<div class="row" style="flex-basis:100%"><button class="btn small" id="osm">Chercher téléphone et GPS (OpenStreetMap)</button>
+    <button class="btn small" id="pappers">Compléter via Pappers</button></div>`}
+  </div>`;
+  bindFiche();
+  if(!real)paintComp();
+  if(keep){const el=document.getElementById(keep);if(el&&el.focus)el.focus()}
+}
+function bindFiche(){
+  const e=cur,S=id=>$(id);
+  const persist=()=>{if(!e._new)saveEnt(e).then(()=>{const s=S("#saved");if(s)s.textContent="Enregistré"})};
+  S("#close").onclick=closeFiche;
+  const bindText=(id,key)=>{const el=S(id);if(el)el.oninput=()=>{e[key]=el.value;persist()}};
+  ["nom","raison","tel","contact","fonction","mobile","notes"].forEach(k=>bindText("#f_"+k,k));
+  S("#f_tel").addEventListener("input",()=>{S("#call").href="tel:"+S("#f_tel").value.replace(/\s/g,"")});
+  S("#f_adresse").onchange=ev=>{e.adresse=ev.target.value;e.cp="";e.commune="";persist()};
+  S("#gps").onclick=async()=>{try{toast("Recherche de la position…");e.posTerrain=await getPos();if(!e.lat){e.lat=e.posTerrain.lat;e.lng=e.posTerrain.lng}persist();renderFiche()}catch(er){toast(er.message)}};
+  const g2=S("#gps2");if(g2)g2.onclick=()=>{e.lat=e.posTerrain.lat;e.lng=e.posTerrain.lng;persist();renderFiche();toast("Point du commerce mis à jour")};
+  S("#d_oui").onclick=()=>{e.refus=null;e._oui=true;persist();renderFiche()};
+  S("#d_non").onclick=()=>{
+    if((e.devis||[]).length){toast("Supprimez d'abord les devis de cette fiche.");return}
+    e._oui=false;if(!e.refus)e.refus={relance:"",motif:""};persist();renderFiche()};
+  document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+    e.devis.push({id:uid(),produit:b.dataset.add,montant:"",relance:"",statut:"en cours",date:today()});persist();renderFiche()});
+  document.querySelectorAll("#devislist .devis").forEach(box=>{
+    const i=+box.dataset.i;
+    box.querySelectorAll("[data-k]").forEach(inp=>{
+      const upd=()=>{e.devis[i][inp.dataset.k]=inp.value;persist()};
+      inp.oninput=upd;
+      if(inp.tagName==="SELECT"||inp.dataset.k==="relance")inp.onchange=()=>{upd();renderFiche()};
+    });
+    box.querySelector("[data-del]").onclick=()=>{e.devis.splice(i,1);persist();renderFiche()};
+  });
+  const rd=S("#f_refdate");if(rd)rd.onchange=()=>{e.refus.relance=rd.value;persist();renderFiche()};
+  const rm=S("#f_refmotif");if(rm)rm.oninput=()=>{e.refus.motif=rm.value;persist()};
+  S("#dict").onclick=ev=>dictate(ev.currentTarget,()=>S("#f_notes").value,v=>{S("#f_notes").value=v;e.notes=v;persist()});
+  const o=S("#osm");if(o)o.onclick=()=>lookupOSM(e,false);
+  const pp=S("#pappers");if(pp)pp.onclick=()=>pappersFill(e);
+}
+async function pappersFill(e){
+  const token=ls.get("pappers_token");
+  if(!token){toast("Ajoutez d'abord votre clé Pappers dans l'onglet Données.");return}
+  try{
+    toast("Interrogation de Pappers…");
+    const r=await fetch("https://api.pappers.fr/v2/entreprise?api_token="+encodeURIComponent(token)+"&siren="+encodeURIComponent(e.siren));
+    if(!r.ok)throw new Error("Pappers a répondu "+r.status);
+    const j=await r.json();
+    if(j.numero_tva_intracommunautaire)e.tva=j.numero_tva_intracommunautaire;
+    const s=j.siege||{};
+    if(s.latitude&&s.longitude&&!e.lat){e.lat=+s.latitude;e.lng=+s.longitude}
+    if(j.telephone&&!e.tel)e.tel=j.telephone;
+    await saveEnt(e);renderFiche();toast("Fiche complétée");
+  }catch(er){toast("Pappers : "+er.message,4500)}
+}
+
+/* ---------- données : import, export ---------- */
+let importing=false,stopImport=false;
+function viewDonnees(m){
+  const tokenSet=!!ls.get("pappers_token");
+  m.innerHTML=`
+  <div class="card"><b>Importer toutes les entreprises de Corse</b>
+    <p class="muted small">Alimente la cartographie. Source : base officielle Recherche d'entreprises (data.gouv.fr), entreprises actives de la Corse-du-Sud (2A) et de la Haute-Corse (2B) : SIREN, nom, adresse, code NAF, point GPS ; TVA calculée depuis le SIREN. L'import prend plusieurs minutes et reprend là où il s'est arrêté.</p>
+    <div class="row"><button class="btn primary" id="imp">${importing?"Arrêter":"Lancer / reprendre l'import"}</button></div>
+    <progress id="impbar" value="0" max="1" hidden></progress><div class="small muted" id="imptxt"></div></div>
+
+  <div class="card" style="margin-top:10px"><b>Clé API Pappers</b>
+    <p class="muted small">Facultative. Sert au bouton « Compléter via Pappers » sur une fiche. La clé reste sur ce téléphone.</p>
+    <div class="row"><input id="ptoken" type="password" placeholder="${tokenSet?"Clé enregistrée":"Collez votre clé"}" style="flex:1"><button class="btn" id="psave">Enregistrer</button></div></div>
+
+  <div class="card" style="margin-top:10px"><b>Clé Google Places</b>
+    <p class="muted small">Facultative. Active le bouton « Google » de la cartographie (20 commerces par recherche, Places API nouvelle version). La clé reste sur ce téléphone. Google facture ces appels selon votre compte.</p>
+    <div class="row"><input id="gtoken" type="password" placeholder="${ls.get("google_key")?"Clé enregistrée":"Collez votre clé"}" style="flex:1"><button class="btn" id="gsave">Enregistrer</button></div></div>
+
+  <div class="card" style="margin-top:10px"><b>Export et sauvegarde</b>
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="xlsx">Exporter tout en Excel</button>
+    <button class="btn" id="pilot">Exporter pour le pilotage</button>
+    <button class="btn" id="jsonx">Sauvegarde (.json)</button>
+    <label class="btn" style="margin:0">Restaurer<input type="file" id="jsoni" accept="application/json" hidden></label></div>
+    <p class="muted small">Le fichier complet contient trois onglets. « Exporter pour le pilotage » prépare les colonnes A à I du CRM avec le secteur NAF.</p>
+    <div class="row"><input id="driveurl" type="url" placeholder="Lien Google Drive du fichier de pilotage" style="flex:1"><button class="btn" id="drivesave">Enregistrer le lien</button><button class="btn" id="driveopen">Ouvrir le pilotage</button></div>
+    <div class="row"><input id="syncurl" type="url" placeholder="URL Apps Script de synchronisation" style="flex:1"><button class="btn" id="syncsave">Enregistrer la connexion</button><button class="btn" id="synctest">Autoriser / tester</button></div>
+    <p class="muted small">Après la configuration unique du script Google, « Exporter pour le pilotage » enverra automatiquement les lignes au CRM et gardera aussi un fichier Excel.</p>
+    <p class="muted small">La feuille Google utilise les droits du compte Google. Le lien et l URL de synchronisation sont mémorisés sur ce téléphone.</p></div>`;
+  $("#imp").onclick=()=>{if(importing){stopImport=true}else runImport()};
+  $("#psave").onclick=()=>{const v=$("#ptoken").value.trim();if(v){ls.set("pappers_token",v);$("#ptoken").value="";toast("Clé enregistrée")}};
+  $("#gsave").onclick=()=>{const v=$("#gtoken").value.trim();if(v){ls.set("google_key",v);$("#gtoken").value="";toast("Clé enregistrée")}};
+  $("#xlsx").onclick=exportXlsx;
+  $("#pilot").onclick=exportPilotage;
+  const pilotageUrlDefaut="https://docs.google.com/spreadsheets/d/1rz0lDcEpe-CzY0-lPF2IpqTGpSShwZtG/edit?gid=527750812#gid=527750812";
+  if(!ls.get("pilotage_drive_url"))ls.set("pilotage_drive_url",pilotageUrlDefaut);
+  $("#driveurl").value=ls.get("pilotage_drive_url")||pilotageUrlDefaut;
+  $("#drivesave").onclick=()=>{const v=$("#driveurl").value.trim();if(v&&!(v.startsWith("https://drive.google.com/")||v.startsWith("https://docs.google.com/spreadsheets/d/"))){toast("Collez un lien Google Drive ou Google Sheets valide");return}ls.set("pilotage_drive_url",v);toast(v?"Lien du pilotage enregistré":"Lien effacé")};
+  $("#syncurl").value=ls.get("pilotage_sync_url")||"";
+  $("#syncsave").onclick=()=>{const v=$("#syncurl").value.trim();if(v&&(!v.startsWith("https://script.google.com/macros/s/")||!v.includes("/exec"))){toast("Collez l’URL Apps Script qui finit par /exec");return}ls.set("pilotage_sync_url",v);toast(v?"Connexion de synchronisation enregistrée":"Connexion effacée")};
+  $("#synctest").onclick=()=>{const v=ls.get("pilotage_sync_url");if(!v){toast("Enregistrez d’abord l’URL Apps Script");return}window.open(v,"_blank","noopener,noreferrer")};  $("#driveopen").onclick=()=>{const v=ls.get("pilotage_drive_url");if(!v){toast("Enregistrez d’abord le lien Google Drive");return}window.open(v,"_blank","noopener,noreferrer")};
+  $("#jsonx").onclick=()=>download(new Blob([JSON.stringify(ents)],{type:"application/json"}),"prospection-corse-"+today()+".json");
+  $("#jsoni").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;
+    try{const arr=JSON.parse(await f.text());if(!Array.isArray(arr))throw 0;
+      const list=arr.filter(x=>x&&x.siren).map(newEnt);await dbPutMany(list);await loadAll();render();toast(list.length+" fiches restaurées")}catch(er){toast("Fichier de sauvegarde invalide")}};
+}
+async function download(blob,name){
+  try{const file=new File([blob],name,{type:blob.type||"application/octet-stream"});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
+  catch(er){if(er&&er.name==="AbortError")return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)
+}
+function codeSecteurMetier(naf){
+  const raw=String(naf||"").toUpperCase().replace(/\s/g,"");
+  if(/^03\.?11/.test(raw))return"EZ";
+  if(/^68\.?20A/.test(raw))return"EZ";
+  if(/^49\.?10/.test(raw))return"G";
+  if(/^49\.?20/.test(raw))return"Y";
+  const n=raw.replace(/[^0-9]/g,"");
+  if(n.length<2)return"";
+  const has=(...p)=>p.some(x=>n.startsWith(x));
+  if(has("8030"))return"34";
+  if(has("4771","4772"))return"CZ";
+  if(has("7711","7712"))return"G";
+  if(has("7721"))return"V";
+  if(has("7734","5010","5030"))return"EZ";
+  if(has("8230"))return"W";
+  if(has("8511","8551"))return"V";
+  if(has("8552"))return"M";
+  if(has("8553"))return"G";
+  if(has("7111"))return"E";
+  if(has("7112","7120"))return"BZ";
+  if(has("6910"))return"O";
+  if(has("6920"))return"N";
+  if(has("7021"))return"L";
+  if(has("7022"))return"X";
+  if(has("7410","7420","7430"))return"M";
+  if(has("7490"))return"34";
+  if(has("5829"))return"K";
+  if(has("5811","5813","5814","5819","591","592","60"))return"M";
+  if(has("4221","4222","4322"))return"33";
+  if(has("4931","4932","4939"))return"G";
+  if(has("4941","4942","4950"))return"Y";
+  if(has("9523","9524","9525","9529"))return"R";
+  if(has("9511","9512"))return"K";
+  if(has("9531"))return"G";
+  if(has("9601"))return"T";
+  if(has("9602","9604"))return"D";
+  if(has("9603"))return"FZ";
+  if(has("9412"))return"34";
+  if(has("9499"))return"AZ";
+  const d=Number(n.slice(0,2));
+  if(d>=1&&d<=3)return"B";
+  if(d>=5&&d<=33){
+    if(d===13||d===14||d===15)return"CZ";
+    if(d===32&&!has("3250"))return"R";
+    return"Q";
+  }
+  if(d===35||d===38||d===39)return"S";
+  if(d===36||d===37)return"33";
+  if(d>=41&&d<=43)return"E";
+  if(d===45)return"G";
+  if(d===46||d===47)return"H";
+  if(d===49)return"Y";
+  if(d===50)return"EZ";
+  if(d===51)return"G";
+  if(d===52||d===53)return"Y";
+  if(d===55||d===56||d===79)return"A";
+  if(d===58||d===59||d===60)return"M";
+  if(d===61||d===62||d===63)return"K";
+  if(d>=64&&d<=66)return"N";
+  if(d===68)return"F";
+  if(d===69)return"34";
+  if(d===70)return"X";
+  if(d===71||d===72)return"BZ";
+  if(d===73)return"L";
+  if(d===74)return"34";
+  if(d===75)return"J";
+  if(d===77)return"34";
+  if(d===78)return"X";
+  if(d===80)return"U";
+  if(d===81)return has("811")?"X":"T";
+  if(d===82)return has("823")?"W":"X";
+  if(d===84)return"Z";
+  if(d===85)return"P";
+  if(d===86)return"C";
+  if(d===87||d===88)return"AZ";
+  if(d===90)return"M";
+  if(d===91)return"DZ";
+  if(d===92||d===93)return"V";
+  if(d===94)return"AZ";
+  if(d===95)return"34";
+  if(d===96)return"34";
+  if(d===97||d===98)return"I";
+  return"";
+}
+async function rechercherNafPilotage(e){
+  if(e.naf)return e.naf;
+  const s=String(e.siren||""),t=String(e.siret||"");
+  const siren=/^\d{9}$/.test(s)?s:(/^\d{14}$/.test(t)?t.slice(0,9):"");
+  if(!siren)return"";
+  try{
+    const r=await fetch("https://recherche-entreprises.api.gouv.fr/search?q="+encodeURIComponent(siren)+"&per_page=5");
+    if(!r.ok)return"";
+    const j=await r.json(),x=(j.results||[]).find(v=>String(v.siren||"")===siren);
+    if(!x)return"";
+    const g=x.siege||{},naf=g.activite_principale||x.activite_principale||"";
+    if(naf){e.naf=naf;e.section=x.section_activite_principale||sectionOf(naf);await saveEnt(e)}
+  }catch(er){}
+  return e.naf||"";
+}
+function synchroniserPilotage(rows,url,target){
+  const form=document.createElement("form");
+  form.method="POST";form.action=url;form.target=target;form.style.display="none";
+  const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows});
+  form.appendChild(input);document.body.appendChild(form);form.submit();form.remove();
+  return true;
+}
+async function exportPilotage(){
+  const syncUrl=ls.get("pilotage_sync_url");
+  const syncTarget=syncUrl?"pilotage_sync_"+Date.now():"";
+  const syncTab=syncUrl?window.open("about:blank",syncTarget):null;
+  const prospects=ents.filter(e=>!/^\d{9}$/.test(e.siren)||e.contact||e.mobile||e.fonction||e.notes||(e.devis||[]).length||e.refus||e.posTerrain);
+  toast("Vérification des codes NAF…",5000);
+  const sansNaf=prospects.filter(e=>!e.naf);
+  for(let i=0;i<sansNaf.length;i+=3)await Promise.all(sansNaf.slice(i,i+3).map(rechercherNafPilotage));
+  const rows=prospects.map(e=>({
+    "Entreprise":e.nom,"Adresse":[e.adresse,e.cp,e.commune].filter(Boolean).join(", "),"Téléphone commerce":e.tel,
+    "Portable contact":e.mobile,"Coordonnées GPS":e.lat&&e.lng?e.lat+", "+e.lng:"",
+    "Devis souhaité":(e.devis||[]).length?"☑":"","Décideur":e.contact,"Fonction":e.fonction,
+    "Secteur":codeSecteurMetier(e.naf)
+  }));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows,{header:["Entreprise","Adresse","Téléphone commerce","Portable contact","Coordonnées GPS","Devis souhaité","Décideur","Fonction","Secteur"]}),"02_CRM_Prospects");
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  const syncSent=syncUrl&&syncTab?synchroniserPilotage(rows,syncUrl,syncTarget):false;
+  download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-pour-pilotage-"+today()+".xlsx");
+  const sansSecteur=rows.filter(r=>!r.Secteur).length;
+  let msg=rows.length+" entreprises exportées; "+sansSecteur+" sans secteur NAF reconnu.";
+  if(syncSent)msg+=" Envoi lancé; regarde la réponse dans l’onglet ouvert.";
+  else if(syncUrl)msg+=" Envoi bloqué par le navigateur; autorise les fenêtres pour cette application.";
+  else msg+=" Enregistre l’URL Apps Script pour activer l’envoi automatique.";
+  toast(msg,6000)
+}
+function exportXlsx(){
+  const rows=ents.map(e=>({SIREN:e.siren,Nom:e.nom,"Raison sociale":e.raison,SIRET:e.siret,Adresse:e.adresse,"Code postal":e.cp,Commune:e.commune,Département:e.dept,
+    "Code NAF":e.naf,Catégorie:catLabel(e),"TVA intracommunautaire":e.tva,Latitude:e.lat,Longitude:e.lng,
+    Téléphone:e.tel,Contact:e.contact,Fonction:e.fonction,"Portable contact":e.mobile,
+    État:LABEL[etat(e)],
+    "Latitude relevée":e.posTerrain?e.posTerrain.lat:"","Longitude relevée":e.posTerrain?e.posTerrain.lng:"","Date relevé GPS":e.posTerrain?e.posTerrain.date.slice(0,10):"",
+    "Produits proposés":[...new Set((e.devis||[]).map(d=>d.produit).filter(Boolean))].join(", "),
+    "Devis en cours":devisEnCours(e).length,"Montant HT en cours":devisEnCours(e).reduce((a,d)=>a+(Number(d.montant)||0),0),
+    "Prochaine relance":(relanceInfo(e)||{}).date||"","Pas de devis (relance)":e.refus?e.refus.relance:"","Motif":e.refus?e.refus.motif:"","Compte rendu":e.notes}));
+  const devis=[];ents.forEach(e=>(e.devis||[]).forEach(d=>devis.push({SIREN:e.siren,Nom:e.nom,Produit:d.produit,"Montant HT":Number(d.montant)||0,Relance:d.relance,Statut:d.statut,"Créé le":d.date})));
+  const rel=ents.filter(e=>relanceInfo(e)).map(e=>({SIREN:e.siren,Nom:e.nom,Téléphone:e.tel,Contact:e.contact,Relance:relanceInfo(e).date,"En retard":relanceInfo(e).late?"oui":""}))
+    .sort((a,b)=>a.Relance.localeCompare(b.Relance));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),"Entreprises");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(devis),"Devis");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rel),"Relances");
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-corse-"+today()+".xlsx");
+}
+async function runImport(){
+  importing=true;stopImport=false;if(tab==="donnees")viewDonnees($("#main"));
+  const bar=()=>$("#impbar"),txt=()=>$("#imptxt");
+  const segs=[];["2A","2B"].forEach(d=>Object.keys(SECTIONS).forEach(s=>segs.push([d,s])));
+  let added=0;
+  try{
+    for(let si=0;si<segs.length&&!stopImport;si++){
+      const [d,s]=segs[si],key="imp:"+d+":"+s;
+      let page=(await metaGet(key))||1;
+      if(page===-1)continue;
+      for(;;){
+        if(stopImport)break;
+        const url="https://recherche-entreprises.api.gouv.fr/search?departement="+d+"&section_activite_principale="+s+"&etat_administratif=A&per_page=25&page="+page;
+        let j=null;
+        for(let k=0;k<4;k++){
+          const r=await fetch(url);
+          if(r.status===429){await sleep(1500*(k+1));continue}
+          if(r.status===400){j={results:[],total_pages:0};break}
+          if(!r.ok)throw new Error("Erreur serveur "+r.status);
+          j=await r.json();break;
+        }
+        if(!j)throw new Error("Trop de requêtes, réessayez dans une minute");
+        const batch=[];
+        (j.results||[]).forEach(x=>{
+          const g=x.siege||{},siren=String(x.siren||"");
+          if(!siren||byId.has(siren))return;
+          const naf=g.activite_principale||x.activite_principale||"";
+          batch.push(newEnt({siren,nom:x.nom_complet||x.nom_raison_sociale||"",adresse:g.adresse?g.adresse.replace(/\s+\d{5}\s.*$/,""):"",
+            cp:g.code_postal||"",commune:g.libelle_commune||"",dept:d,naf,section:x.section_activite_principale||sectionOf(naf),
+            tva:tvaFromSiren(siren),lat:g.latitude?+g.latitude:null,lng:g.longitude?+g.longitude:null}));
+        });
+        if(batch.length){await dbPutMany(batch);batch.forEach(e=>{ents.push(e);byId.set(e.siren,e);index(e)});added+=batch.length}
+        const tp=Math.min(j.total_pages||0,400);
+        if(bar()){bar().hidden=false;bar().max=segs.length;bar().value=si+(tp?Math.min(page/tp,1):1)}
+        if(txt())txt().textContent="Département "+d+" · section "+s+" · page "+page+"/"+(tp||1)+" · "+added.toLocaleString("fr-FR")+" nouvelles fiches";
+        $("#count").textContent=ents.length.toLocaleString("fr-FR")+" fiches";
+        if(!j.results||!j.results.length||page>=tp){await metaSet(key,-1);break}
+        page++;await metaSet(key,page);await sleep(160);
+      }
+    }
+    if(txt())txt().textContent=(stopImport?"Import arrêté. ":"Import terminé. ")+added.toLocaleString("fr-FR")+" nouvelles fiches.";
+  }catch(er){toast("Import interrompu : "+er.message,5000);if(txt())txt().textContent="Interrompu : "+er.message+". Relancez pour reprendre."}
+  importing=false;stopImport=false;
+  const b=$("#imp");if(b)b.textContent="Lancer / reprendre l'import";
+}
+
+/* ---------- démarrage ---------- */
+async function loadAll(){
+  ents=await dbAll();byId=new Map();searchIdx=new Map();
+  ents.forEach(e=>{if(!e.devis)e.devis=[];byId.set(e.siren,e);index(e)});
+}
+document.addEventListener("click",ev=>{
+  const o=ev.target.closest("[data-open]");if(o){openFiche(o.dataset.open);return}
+  const p=ev.target.closest("[data-pick]");if(p){pickOnline(+p.dataset.pick);return}
+  const pl=ev.target.closest("[data-place]");if(pl){pickPlace(+pl.dataset.place);return}
+  const q=ev.target.closest("[data-poi]");if(q){pickPoi(+q.dataset.poi);return}
+  const g=ev.target.closest("[data-go]");if(g)setTab(g.dataset.go);
+});
+$("#nav").addEventListener("click",ev=>{const b=ev.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)});
+(async()=>{
+  try{idb=await openDB();await loadAll()}
+  catch(er){$("#main").innerHTML='<div class="card">Le stockage du navigateur est indisponible (navigation privée ?). Ouvrez le site dans un onglet normal.</div>';return}
+  render();
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+})();
+</script>
+</body>
+</html>
