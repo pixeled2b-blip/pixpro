@@ -457,15 +457,18 @@ function drawMarkers(){
   if(!map||tab!=="carte")return;
   layer.clearLayers();
   const prod=MAPF.prod;
-  let list=ents.filter(e=>e.lat&&e.lng);
-  if(MAPF.radius&&me)list=list.filter(e=>km(me.lat,me.lng,e.lat,e.lng)<=MAPF.radius);
-  const withState=list.map(e=>({e,s:etat(e,prod)}));
+  let list=ents.map(e=>({e,
+    lat:Number.isFinite(Number(e.lat))&&e.lat!==null&&e.lat!==""?Number(e.lat):Number(e.posTerrain?.lat),
+    lng:Number.isFinite(Number(e.lng))&&e.lng!==null&&e.lng!==""?Number(e.lng):Number(e.posTerrain?.lng)
+  })).filter(o=>Number.isFinite(o.lat)&&Number.isFinite(o.lng));
+  if(MAPF.radius&&me)list=list.filter(o=>km(me.lat,me.lng,o.lat,o.lng)<=MAPF.radius);
+  const withState=list.map(o=>({...o,s:etat(o.e,prod)}));
   const counts={client:0,devis:0,refus:0,afaire:0};withState.forEach(o=>counts[o.s]++);
   const shown=withState.filter(o=>!MAPF.etat||o.s===MAPF.etat);
   const cap=6000;
   // les fiches faites passent au-dessus des prospects à faire
-  shown.sort((a,b)=>(a.s==="afaire"?0:1)-(b.s==="afaire"?0:1)).slice(0,cap).forEach(({e,s})=>{
-    L.circleMarker([e.lat,e.lng],{radius:s==="afaire"?5:8,color:"#fff",weight:1,fillColor:COL[s],fillOpacity:.95})
+  shown.sort((a,b)=>(a.s==="afaire"?0:1)-(b.s==="afaire"?0:1)).slice(0,cap).forEach(({e,lat,lng,s})=>{
+    L.circleMarker([lat,lng],{radius:s==="afaire"?5:8,color:"#fff",weight:1,fillColor:COL[s],fillOpacity:.95})
       .bindTooltip(e.nom||e.siren).on("click",()=>openFiche(e.siren)).addTo(layer);
   });
   $("#legend").innerHTML=Object.keys(LABEL).map(k=>`<span><span class="dot" style="background:${COL[k]}"></span>${LABEL[k]} ${counts[k]}</span>`).join("")+`<span><span class="dot" style="background:#fff;border:2px solid #333;width:6px;height:6px"></span>Trouvé sur internet</span>`;
@@ -474,7 +477,7 @@ function drawMarkers(){
   // liste des prospects à faire les plus proches
   const near=$("#near");
   if(!me){near.innerHTML=`<div class="card muted small">Autorisez la localisation pour lister les prospects à faire autour de vous.</div>`;return}
-  const todo=withState.filter(o=>o.s==="afaire").map(o=>({e:o.e,d:km(me.lat,me.lng,o.e.lat,o.e.lng)})).sort((a,b)=>a.d-b.d).slice(0,25);
+  const todo=withState.filter(o=>o.s==="afaire").map(o=>({e:o.e,d:km(me.lat,me.lng,o.lat,o.lng)})).sort((a,b)=>a.d-b.d).slice(0,25);
   near.innerHTML=`<h3>Prospects à faire les plus proches${prod?" · "+esc(prod):""}</h3>`+(todo.length?todo.map(o=>itemHTML(o.e,fmtDist(o.d))).join(""):`<div class="card muted small">Rien à faire dans cette zone.</div>`);
 }
 
@@ -666,7 +669,7 @@ function renderFiche(){
   const prodOpts=sel=>PRODUITS.concat(sel&&!PRODUITS.includes(sel)?[sel]:[]).map(p=>`<option${p===sel?" selected":""}>${esc(p)}</option>`).join("");
   const keep=document.activeElement&&document.activeElement.id;
   $("#sheet").innerHTML=`
-  <div class="bar"><button class="btn small" id="close">← Retour</button><span class="muted small" id="saved"></span></div>
+  <div class="bar"><button class="btn small" id="close">← Retour</button>${e._new?"":`<button class="btn small danger" id="deleteFiche">Supprimer la fiche</button>`}<span class="muted small" id="saved"></span></div>
   ${e._new?`<input id="f_nom" placeholder="Nom commercial (enseigne)" value="${esc(e.nom)}" style="margin-top:6px">`:`<h2>${esc(e.nom)}</h2>`}
   <div class="small muted">Nom commercial</div>
   <div class="small muted">${esc(catLabel(e))}${e.naf?" · NAF "+esc(e.naf):""}</div>
@@ -733,6 +736,12 @@ function bindFiche(){
   const e=cur,S=id=>$(id);
   const persist=()=>{if(!e._new)saveEnt(e).then(()=>{const s=S("#saved");if(s)s.textContent="Enregistré"})};
   S("#close").onclick=closeFiche;
+  const deleteButton=S("#deleteFiche");if(deleteButton)deleteButton.onclick=async()=>{
+    if(!confirm(`Supprimer définitivement la fiche « ${e.nom||e.siren} » de cette application ?`))return;
+    try{await dbDelete(e.siren);byId.delete(e.siren);searchIdx.delete(e.siren);const i=ents.indexOf(e);if(i>=0)ents.splice(i,1);
+      cur=null;S("#sheet").hidden=true;render();toast("Fiche supprimée de cette application")
+    }catch(er){toast("Suppression impossible : "+(er.message||"erreur"))}
+  };
   const bindText=(id,key)=>{const el=S(id);if(el)el.oninput=()=>{e[key]=el.value;persist()}};
   ["nom","raison","tel","contact","fonction","mobile","notes"].forEach(k=>bindText("#f_"+k,k));
   S("#f_tel").addEventListener("input",()=>{S("#call").href="tel:"+S("#f_tel").value.replace(/\s/g,"")});
