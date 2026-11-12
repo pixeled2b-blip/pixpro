@@ -939,7 +939,7 @@ function synchroniserPilotage(rows,url,target){
 async function exportPilotage(){
   const syncUrl=ls.get("pilotage_sync_url");
   const syncTarget=syncUrl?"pilotage_sync_"+Date.now():"";
-  const prospects=ents;
+  const prospects=ents.filter(e=>!/^\d{9}$/.test(e.siren)||e.contact||e.mobile||e.fonction||e.notes||(e.devis||[]).length||e.refus||e.posTerrain);
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
   for(let i=0;i<sansNaf.length;i+=3)await Promise.all(sansNaf.slice(i,i+3).map(rechercherNafPilotage));
