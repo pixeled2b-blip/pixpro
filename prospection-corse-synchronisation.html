@@ -158,7 +158,8 @@ let mapView=null;
 
 function newEnt(o){
   return Object.assign({siren:"",nom:"",adresse:"",cp:"",commune:"",dept:"",naf:"",section:"",tva:"",lat:null,lng:null,
-    tel:"",contact:"",fonction:"",mobile:"",notes:"",posTerrain:null,devis:[],refus:null,raison:"",siret:"",maj:""},o);
+    tel:"",contact:"",fonction:"",mobile:"",notes:"",posTerrain:null,devis:[],refus:null,raison:"",siret:"",maj:"",
+    typeCommerce:"",priority:"Moyenne",lastContact:""},o);
 }
 function index(e){searchIdx.set(e.siren,norm([e.nom,e.siren,e.commune,e.cp,e.naf,e.contact,e.adresse].join(" ")))}
 function saveEnt(e){e.maj=new Date().toISOString();index(e);return dbPutMany([e])}
@@ -657,7 +658,7 @@ function openFiche(siren,name,pre){
 }
 function closeFiche(){
   if(cur&&cur._new){
-    const used=/^\d{9}$/.test(cur.siren)||(cur.devis||[]).length||cur.refus||cur.notes||cur.contact||cur.mobile;
+    const used=/^\d{9}$/.test(cur.siren)||(cur.devis||[]).length||cur.refus||cur.notes||cur.contact||cur.mobile||cur.typeCommerce||cur.lastContact||cur.priority!=="Moyenne";
     if(cur.nom.trim()&&(!cur._poi||used)){delete cur._new;delete cur._poi;ents.push(cur);byId.set(cur.siren,cur);saveEnt(cur)}
   }
   $("#sheet").hidden=true;cur=null;render();
@@ -674,6 +675,13 @@ function renderFiche(){
   <div class="small muted">Nom commercial</div>
   <div class="small muted">${esc(catLabel(e))}${e.naf?" · NAF "+esc(e.naf):""}</div>
   <div class="badges"><span class="badge"><span class="dot" style="background:${COL[st]}"></span>${LABEL[st]}</span></div>
+
+  <h3>Informations pour le pilotage</h3>
+  <div class="card row">
+    <label class="field"><span>Type de commerce</span><input id="f_typeCommerce" value="${esc(e.typeCommerce)}" placeholder="Ex. camping, hôtel, restaurant"></label>
+    <label class="field"><span>Dernier contact</span><input id="f_lastContact" type="date" value="${esc(e.lastContact||today())}"></label>
+    <label class="field"><span>Priorité</span><select id="f_priority">${["Basse","Moyenne","Haute"].map(p=>`<option value="${p}"${(e.priority||"Moyenne")===p?" selected":""}>${p}</option>`).join("")}</select></label>
+  </div>
 
   <h3>Société</h3>
   <div class="card">
@@ -744,6 +752,9 @@ function bindFiche(){
   };
   const bindText=(id,key)=>{const el=S(id);if(el)el.oninput=()=>{e[key]=el.value;persist()}};
   ["nom","raison","tel","contact","fonction","mobile","notes"].forEach(k=>bindText("#f_"+k,k));
+  bindText("#f_typeCommerce","typeCommerce");
+  S("#f_lastContact").onchange=ev=>{e.lastContact=ev.target.value;persist()};
+  S("#f_priority").onchange=ev=>{e.priority=ev.target.value;persist()};
   S("#f_tel").addEventListener("input",()=>{S("#call").href="tel:"+S("#f_tel").value.replace(/\s/g,"")});
   S("#f_adresse").onchange=ev=>{e.adresse=ev.target.value;e.cp="";e.commune="";persist()};
   S("#gps").onclick=async()=>{try{toast("Recherche de la position…");e.posTerrain=await getPos();if(!e.lat){e.lat=e.posTerrain.lat;e.lng=e.posTerrain.lng}persist();renderFiche()}catch(er){toast(er.message)}};
@@ -934,13 +945,13 @@ async function rechercherNafPilotage(e){
   }catch(er){}
   return e.naf||"";
 }
-function synchroniserPilotage(rows,url,target){
+function synchroniserPilotage(rows,url,target,quotes){
   const frame=document.createElement("iframe");
   frame.name=target;frame.title="Synchronisation du pilotage";frame.style.display="none";
   document.body.appendChild(frame);
   const form=document.createElement("form");
   form.method="POST";form.action=url;form.target=target;form.style.display="none";
-  const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows});
+  const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows,quotes:quotes||[]});
   form.appendChild(input);document.body.appendChild(form);form.submit();form.remove();
   setTimeout(()=>frame.remove(),30000);
   return true;
@@ -952,16 +963,42 @@ async function exportPilotage(){
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
   for(let i=0;i<sansNaf.length;i+=3)await Promise.all(sansNaf.slice(i,i+3).map(rechercherNafPilotage));
-  const rows=prospects.map(e=>({
+  const saves=[];
+  const rows=prospects.map(e=>{
+    e.lastContact=e.lastContact||today();e.priority=e.priority||"Moyenne";e.typeCommerce=e.typeCommerce||"";
+    saves.push(saveEnt(e));
+    const devis=e.devis||[],montantTotal=devis.reduce((a,d)=>a+(Number(d.montant)||0),0);
+    const prochaine=(relanceInfo(e)||{}).date||"";
+    const datePremierContact=e.datePremierContact||e.lastContact;
+    const statutSuivi=devis.some(d=>d.statut==="accepté")?"Client actif":(e.refus||prochaine?"À relancer":"Prospect");
+    const montantEnCours=devis.filter(d=>d.statut==="en cours").reduce((a,d)=>a+(Number(d.montant)||0),0);
+    const montantSigne=devis.filter(d=>d.statut==="accepté").reduce((a,d)=>a+(Number(d.montant)||0),0);
+    const ville=e.commune||((String(e.adresse||"")+" "+String(e.cp||"")).match(/\b\d{5}\s+([^,]+)/)||[])[1]||"";
+    return {
     "Entreprise":e.nom,"Adresse":[e.adresse,e.cp,e.commune].filter(Boolean).join(", "),"Téléphone commerce":e.tel,
-    "Portable contact":e.mobile,"Coordonnées GPS":e.lat&&e.lng?e.lat+", "+e.lng:"",
-    "Devis souhaité":(e.devis||[]).length?"☑":"","Décideur":e.contact,"Fonction":e.fonction,
-    "Secteur":codeSecteurMetier(e.naf)
-  }));
+    "Portable contact":e.mobile,"Coordonnées GPS":e.lat!=null&&e.lng!=null?e.lat+", "+e.lng:"",
+    "Devis souhaité":demande(e)==="oui"?"☑":"","Décideur":e.contact,"Fonction":e.fonction,
+    "Secteur":codeSecteurMetier(e.naf),"Commercial":"Commercial 1","Type":e.typeCommerce,
+    "Ville/Région":ville,"Potentiel /an  (€)":montantTotal||"","Source":"Prospection",
+    "Dernier contact":e.lastContact,"Date estimée":prochaine,"Priorité":e.priority,
+    "Montant opportunité (€)":montantEnCours||"","Montant Signé":montantSigne||"",
+    "Statut":"Actif","Date 1er contact":datePremierContact,"Statut client":statutSuivi,
+    "devis":devis.map((d,i)=>({
+      "N° devis":"APP-"+e.siren+"-"+(d.id||i+1),"Client":e.nom,"Code secteur":codeSecteurMetier(e.naf),
+      "Nature du produit vendu":d.produit,"Date demande de devis":d.date||e.lastContact,
+      "Montant HT (€)":Number(d.montant)||0,
+      "Statut":d.statut==="accepté"?"Réussi":d.statut==="refusé"?"Perdu":"En cours",
+      "Date de relance":d.relance||""
+    }))
+  }});
+  await Promise.all(saves);
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows,{header:["Entreprise","Adresse","Téléphone commerce","Portable contact","Coordonnées GPS","Devis souhaité","Décideur","Fonction","Secteur"]}),"02_CRM_Prospects");
+  const crmHeaders=["Entreprise","Adresse","Téléphone commerce","Portable contact","Coordonnées GPS","Devis souhaité","Décideur","Fonction","Secteur","Commercial","Type","Ville/Région","Potentiel /an  (€)","Source","Dernier contact","Prochaine action","Étape","Probabilité","Date estimée","Montant opportunité (€)","Priorité","Statut","Montant Signé"];
+  const crmRows=rows.map(row=>Object.fromEntries(crmHeaders.map(h=>[h,row[h]??""])));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crmRows,{header:crmHeaders}),"02_CRM_Prospects");
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-  const syncSent=syncUrl?synchroniserPilotage(rows,syncUrl,syncTarget):false;
+  const syncRows=rows.map(({devis,...row})=>row),quotes=rows.flatMap(row=>row.devis);
+  const syncSent=syncUrl?synchroniserPilotage(syncRows,syncUrl,syncTarget,quotes):false;
   download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-pour-pilotage-"+today()+".xlsx");
   const sansSecteur=rows.filter(r=>!r.Secteur).length;
   let msg=rows.length+" entreprises exportées; "+sansSecteur+" sans secteur NAF reconnu.";
