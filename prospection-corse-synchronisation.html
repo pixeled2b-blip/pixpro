@@ -936,7 +936,7 @@ async function rechercherNafPilotage(e){
   const siren=/^\d{9}$/.test(s)?s:(/^\d{14}$/.test(t)?t.slice(0,9):"");
   if(!siren)return"";
   try{
-    const r=await fetch("https://recherche-entreprises.api.gouv.fr/search?q="+encodeURIComponent(siren)+"&per_page=5");
+    const r=await fetch("https://recherche-entreprises.api.gouv.fr/search?q="+encodeURIComponent(siren)+"&per_page=5",{signal:AbortSignal.timeout(7000)});
     if(!r.ok)return"";
     const j=await r.json(),x=(j.results||[]).find(v=>String(v.siren||"")===siren);
     if(!x)return"";
@@ -965,7 +965,7 @@ async function exportPilotage(){
   const prospects=ents.filter(e=>!/^\d{9}$/.test(e.siren)||e.contact||e.mobile||e.fonction||e.notes||(e.devis||[]).length||e.refus||e.posTerrain);
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
-  for(let i=0;i<sansNaf.length;i+=3)await Promise.all(sansNaf.slice(i,i+3).map(rechercherNafPilotage));
+  for(let i=0;i<sansNaf.length;i+=8)await Promise.all(sansNaf.slice(i,i+8).map(rechercherNafPilotage));
   const saves=[];
   const rows=prospects.map(e=>{
     e.lastContact=e.lastContact||today();e.priority=e.priority||"Moyenne";e.typeCommerce=e.typeCommerce||"";
@@ -999,9 +999,9 @@ async function exportPilotage(){
   const crmHeaders=["Entreprise","Adresse","Téléphone commerce","Portable contact","Coordonnées GPS","Devis souhaité","Décideur","Fonction","Secteur","Commercial","Type","Ville/Région","Potentiel /an  (€)","Source","Dernier contact","Prochaine action","Étape","Probabilité","Date estimée","Montant opportunité (€)","Priorité","Statut","Montant Signé"];
   const crmRows=rows.map(row=>Object.fromEntries(crmHeaders.map(h=>[h,row[h]??""])));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crmRows,{header:crmHeaders}),"02_CRM_Prospects");
-  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   const syncRows=rows.map(({devis,...row})=>row),quotes=rows.flatMap(row=>row.devis);
   const syncSent=syncUrl&&syncWindow?synchroniserPilotage(syncRows,syncUrl,syncTarget,quotes):false;
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-pour-pilotage-"+today()+".xlsx");
   const sansSecteur=rows.filter(r=>!r.Secteur).length;
   let msg=rows.length+" entreprises exportées; "+sansSecteur+" sans secteur NAF reconnu.";
