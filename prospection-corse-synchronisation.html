@@ -946,19 +946,22 @@ async function rechercherNafPilotage(e){
   return e.naf||"";
 }
 function synchroniserPilotage(rows,url,target,quotes){
-  const frame=document.createElement("iframe");
-  frame.name=target;frame.title="Synchronisation du pilotage";frame.style.display="none";
-  document.body.appendChild(frame);
   const form=document.createElement("form");
   form.method="POST";form.action=url;form.target=target;form.style.display="none";
   const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows,quotes:quotes||[]});
   form.appendChild(input);document.body.appendChild(form);form.submit();form.remove();
-  setTimeout(()=>frame.remove(),30000);
   return true;
 }
 async function exportPilotage(){
   const syncUrl=ls.get("pilotage_sync_url");
   const syncTarget=syncUrl?"pilotage_sync_"+Date.now():"";
+  // Ouvrir la fenêtre pendant le clic utilisateur : la connexion privée Google
+  // est utilisée comme navigation principale, sans iframe tiers cachée.
+  const syncWindow=syncUrl?window.open("about:blank",syncTarget):null;
+  if(syncWindow){
+    syncWindow.document.title="Envoi au pilotage";
+    syncWindow.document.body.innerHTML="<p style='font:16px Arial;padding:24px'>Préparation de l’envoi au pilotage…</p>";
+  }
   const prospects=ents.filter(e=>!/^\d{9}$/.test(e.siren)||e.contact||e.mobile||e.fonction||e.notes||(e.devis||[]).length||e.refus||e.posTerrain);
   toast("Vérification des codes NAF…",5000);
   const sansNaf=prospects.filter(e=>!e.naf);
@@ -998,12 +1001,12 @@ async function exportPilotage(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crmRows,{header:crmHeaders}),"02_CRM_Prospects");
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   const syncRows=rows.map(({devis,...row})=>row),quotes=rows.flatMap(row=>row.devis);
-  const syncSent=syncUrl?synchroniserPilotage(syncRows,syncUrl,syncTarget,quotes):false;
+  const syncSent=syncUrl&&syncWindow?synchroniserPilotage(syncRows,syncUrl,syncTarget,quotes):false;
   download(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"prospection-pour-pilotage-"+today()+".xlsx");
   const sansSecteur=rows.filter(r=>!r.Secteur).length;
   let msg=rows.length+" entreprises exportées; "+sansSecteur+" sans secteur NAF reconnu.";
   if(syncSent)msg+=" Synchronisation envoyée au pilotage; vérifie l’onglet 02_CRM_Prospects.";
-  else if(syncUrl)msg+=" Envoi bloqué par le navigateur; réessaie après avoir autorisé les téléchargements.";
+  else if(syncUrl)msg+=" Fenêtre d’envoi bloquée : autorise les fenêtres pop-up pour ce site puis réessaie.";
   else msg+=" Enregistre l’URL Apps Script pour activer l’envoi automatique.";
   toast(msg,6000)
 }
