@@ -848,7 +848,9 @@ async function download(blob,name){
 }
 function codeSecteurMetier(naf){
   const raw=String(naf||"").toUpperCase().replace(/\s/g,"");
-  if(/^67\.?2Z?$/.test(raw))return"K";
+  if(/^67\.?2Z?$/.test(raw))return"N";
+  if(/^10\.?71C?$/.test(raw))return"A";
+  if(/^47\.?74/.test(raw))return"C";
   if(/^03\.?11/.test(raw))return"EZ";
   if(/^68\.?20A/.test(raw))return"EZ";
   if(/^49\.?10/.test(raw))return"G";
