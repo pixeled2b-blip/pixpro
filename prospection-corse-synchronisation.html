@@ -106,7 +106,7 @@ function km(a,b,c,d){const R=6371000,t=x=>x*Math.PI/180,dl=t(c-a),dn=t(d-b);
 const fmtDist=m=>m<1000?Math.round(m)+" m":(m/1000).toFixed(1).replace(".",",")+" km";
 
 /* ---------- produits, états, couleurs ---------- */
-const PRODUITS=["TV hospitality","Écran LED","Écran intérieur","Écran extérieur","Halo","TBI","WiFi","Caméra","Alarme","Serrure connectée","Fibre"];
+const PRODUITS=["TV hospitality","Écran LED","Écran intérieur","Écran extérieur","Halo","TBI","WiFi","Caméra","Alarme","Serrure connectée","Fibre","E-Paper","Écran vitrine","Borne interactive","Stop trottoir","Totem classique","Totem pliable","Totem extérieur","Système d'encaissement"];
 const COL={client:"#2f9e5a",devis:"#e8830c",refus:"#7b3fc4",afaire:"#5b6b7a"};
 const LABEL={client:"Client",devis:"Devis fait",refus:"Pas de devis",afaire:"À faire"};
 /* état d'une fiche, global ou pour un produit */
@@ -951,7 +951,7 @@ async function rechercherNafPilotage(e){
 function synchroniserPilotage(rows,url,target,quotes){
   const form=document.createElement("form");
   form.method="POST";form.action=url;form.target=target;form.style.display="none";
-  const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows,quotes:quotes||[]});
+  const input=document.createElement("input");input.type="hidden";input.name="payload";input.value=JSON.stringify({rows,quotes:quotes||[],authToken:sessionStorage.getItem("prospection_auth_token")||""});
   form.appendChild(input);document.body.appendChild(form);form.submit();form.remove();
   return true;
 }
@@ -1091,12 +1091,30 @@ document.addEventListener("click",ev=>{
   const g=ev.target.closest("[data-go]");if(g)setTab(g.dataset.go);
 });
 $("#nav").addEventListener("click",ev=>{const b=ev.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)});
-(async()=>{
+async function startApplication(){
   try{idb=await openDB();await loadAll()}
   catch(er){$("#main").innerHTML='<div class="card">Le stockage du navigateur est indisponible (navigation privée ?). Ouvrez le site dans un onglet normal.</div>';return}
   render();
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-})();
+}
+function authGate(){
+  const fragment=new URLSearchParams(location.hash.slice(1));
+  const received=fragment.get("otp"),expires=Number(fragment.get("exp")||0);
+  if(received&&expires){
+    sessionStorage.setItem("prospection_auth_token",received);
+    sessionStorage.setItem("prospection_auth_expires",String(expires));
+    history.replaceState(null,"",location.pathname+location.search);
+  }
+  const token=sessionStorage.getItem("prospection_auth_token");
+  const validUntil=Number(sessionStorage.getItem("prospection_auth_expires")||0);
+  if(!token||!validUntil||Date.now()>validUntil){
+    sessionStorage.removeItem("prospection_auth_token");sessionStorage.removeItem("prospection_auth_expires");
+    const loginUrl="https://script.google.com/macros/s/AKfycbwfASu-YpcBwYSf0jI_kzyZkpzc6p6NMoMhEY_fZy7qNEMoeMzk-hOS6rQGYRehEgXTTg/exec";
+    location.replace(loginUrl);return;
+  }
+  startApplication();
+}
+authGate();
 </script>
 </body>
 </html>
